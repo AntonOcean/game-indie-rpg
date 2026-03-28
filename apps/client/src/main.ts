@@ -1,6 +1,7 @@
 import "./style.css";
 import "./protocol";
 import { Application } from "pixi.js";
+import { loadGameMap } from "./gameMap";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
 
 async function main(): Promise<void> {
@@ -22,6 +23,8 @@ async function main(): Promise<void> {
   });
 
   host.appendChild(app.canvas);
+
+  await loadGameMap(app);
 
   subscribeViewportResize(() => app.queueResize());
 }
