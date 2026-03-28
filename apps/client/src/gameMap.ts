@@ -1,4 +1,4 @@
-import { Application, Assets, path, type Texture } from "pixi.js";
+import { Application, Assets, Container, path, type Texture } from "pixi.js";
 import {
   TiledMap,
   parseMapAsync,
@@ -154,6 +154,8 @@ export type GameMapMeta = {
 
 export type LoadedGameMap = {
   meta: GameMapMeta;
+  /** Общий корень карты и сущностей мира (камера сдвинет его позже). */
+  worldRoot: Container;
 };
 
 /**
@@ -173,7 +175,9 @@ export async function loadGameMap(app: Application): Promise<LoadedGameMap> {
     collisionsVisual.visible = false;
   }
 
-  app.stage.addChild(container);
+  const worldRoot = new Container();
+  worldRoot.addChild(container);
+  app.stage.addChild(worldRoot);
 
   const meta: GameMapMeta = {
     collisionData,
@@ -193,5 +197,5 @@ export async function loadGameMap(app: Application): Promise<LoadedGameMap> {
     });
   }
 
-  return { meta };
+  return { meta, worldRoot };
 }
