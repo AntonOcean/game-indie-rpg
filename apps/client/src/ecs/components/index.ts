@@ -7,3 +7,4 @@ export { Enemy } from "./enemy";
 export { Health } from "./health";
 export { AttackCooldown } from "./attackCooldown";
 export { Dead } from "./dead";
+export { Loot } from "./loot";

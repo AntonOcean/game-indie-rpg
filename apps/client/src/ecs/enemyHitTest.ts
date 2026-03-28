@@ -1,5 +1,5 @@
-import { query, type World } from "bitecs";
-import { Enemy, Hitbox, Position } from "./components";
+import { hasComponent, query, type World } from "bitecs";
+import { Dead, Enemy, Hitbox, Position } from "./components";
 
 function pointInEntityHitbox(wx: number, wy: number, eid: number): boolean {
   const hw = Hitbox.width[eid] / 2;
@@ -28,6 +28,9 @@ export function pickEnemyAtWorld(
   let bestD2 = Infinity;
   for (let i = 0; i < entities.length; i++) {
     const eid = entities[i];
+    if (hasComponent(world, eid, Dead)) {
+      continue;
+    }
     if (!pointInEntityHitbox(wx, wy, eid)) {
       continue;
     }

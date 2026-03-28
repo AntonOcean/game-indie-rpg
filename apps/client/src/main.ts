@@ -9,12 +9,16 @@ import {
   movePlayerWithTileCollisions,
   resolvePlayerIntentToVelocity,
 } from "./ecs/playerLocomotion";
+import { processEnemyDeath } from "./ecs/enemyDeath";
+import { processLootPickup } from "./ecs/lootPickup";
+import { spawnLootEntity } from "./ecs/lootSpawn";
 import { resolvePlayerAttack } from "./ecs/playerCombat";
 import { spawnPlayerEntity } from "./ecs/playerSpawn";
 import { Position } from "./ecs/components";
 import { loadGameMap } from "./gameMap";
 import { bindGameInput } from "./input/inputBindings";
 import { emptyPlayerIntent } from "./input/playerIntent";
+import { createLootVisualAt } from "./render/mountLootVisual";
 import { mountEnemyVisual } from "./render/mountEnemyVisual";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
@@ -57,6 +61,10 @@ async function main(): Promise<void> {
   spawnEnemyEntity(ecsWorld, enemyRenderId, meta);
 
   const intent = emptyPlayerIntent();
+  const pendingDestroyRenderIds: number[] = [];
+  let goldCount = 0;
+  const goldHud = document.querySelector<HTMLDivElement>("#hud-gold");
+
   const input = bindGameInput(
     app,
     worldRoot,
@@ -73,7 +81,27 @@ async function main(): Promise<void> {
     resolvePlayerIntentToVelocity(playerEid, intent);
     movePlayerWithTileCollisions(playerEid, meta, dtSec);
     resolvePlayerAttack(ecsWorld, playerEid, intent, performance.now());
-    runRenderSystem(ecsWorld, renderRegistry);
+    processEnemyDeath(ecsWorld, (wx, wy) => {
+      const lootRenderId = createLootVisualAt(
+        worldRoot,
+        renderRegistry,
+        wx,
+        wy
+      );
+      spawnLootEntity(ecsWorld, lootRenderId, wx, wy);
+    });
+    const picked = processLootPickup(
+      ecsWorld,
+      playerEid,
+      pendingDestroyRenderIds
+    );
+    if (picked > 0) {
+      goldCount += picked;
+      if (goldHud) {
+        goldHud.textContent = `Gold: ${goldCount}`;
+      }
+    }
+    runRenderSystem(ecsWorld, renderRegistry, pendingDestroyRenderIds);
     updateWorldCamera(
       worldRoot,
       meta,

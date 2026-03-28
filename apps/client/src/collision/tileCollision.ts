@@ -54,3 +54,12 @@ export function aabbFromCenter(
     bottom: cy + halfH,
   };
 }
+
+export function aabbIntersects(a: AabbWorldPx, b: AabbWorldPx): boolean {
+  return !(
+    a.right < b.left ||
+    a.left > b.right ||
+    a.bottom < b.top ||
+    a.top > b.bottom
+  );
+}

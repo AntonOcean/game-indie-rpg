@@ -1,16 +1,15 @@
 /**
- * Фиксированный порядок игровых систем (расширяется в следующих фазах).
- *
- * Текущий ран: на Ticker вызывается только этап render_sync.
+ * Фиксированный порядок игровых систем (implementation-plan, фазы 5–6).
  *
  * 1. input_aggregate — сырой ввод → PlayerIntent
- * 2. intent_resolve — движение / атака / idle
+ * 2. intent_resolve — скорость игрока из намерения
  * 3. movement — смещение Position
  * 4. collision — откат по тайлам
- * 5. combat — урон, кулдауны
- * 6. loot — спавн/подбор
- * 7. render_sync — RenderSystem: ECS → реестр Pixi
- * 8. camera — worldRoot / clamp (фаза 4)
+ * 5. combat — урон по цели, кулдаун (живые враги без `Dead`)
+ * 6. death — `Health <= 0` → `Dead`, колбэк спавна лута в позиции врага
+ * 7. loot_pickup — пересечение AABB игрока и лута → удаление сущности, id узла в очередь на destroy
+ * 8. render_sync — destroy очереди, скрытие мёртвых врагов, синхрон позиций
+ * 9. camera — worldRoot / clamp
  */
 export const GAME_PIPELINE_ORDER = [
   "input_aggregate",
@@ -18,7 +17,8 @@ export const GAME_PIPELINE_ORDER = [
   "movement",
   "collision",
   "combat",
-  "loot",
+  "death",
+  "loot_pickup",
   "render_sync",
   "camera",
 ] as const;

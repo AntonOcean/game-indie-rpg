@@ -5,6 +5,7 @@ import {
   Enemy,
   Health,
   Hitbox,
+  Loot,
   Player,
   Position,
   RenderRef,
@@ -23,6 +24,7 @@ export function createGameWorld(): World {
     Health,
     AttackCooldown,
     Dead,
+    Loot,
   ]);
   return world;
 }
