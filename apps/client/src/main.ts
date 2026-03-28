@@ -1,12 +1,16 @@
 import "./style.css";
+import "./protocol";
 import { Application } from "pixi.js";
+import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
 
 async function main(): Promise<void> {
   const host = document.querySelector<HTMLDivElement>("#app");
   if (!host) {
-    console.error('game-rpg: missing #app container');
+    console.error("game-rpg: missing #app container");
     return;
   }
+
+  initTelegramWebAppOnce();
 
   const app = new Application();
   await app.init({
@@ -18,6 +22,8 @@ async function main(): Promise<void> {
   });
 
   host.appendChild(app.canvas);
+
+  subscribeViewportResize(() => app.queueResize());
 }
 
 main().catch((err) => {

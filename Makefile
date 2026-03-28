@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 PROJECT_ROOT := $(abspath .)
 
-.PHONY: help setup install assets-sync build start dev dev-client docker-build docker-up docker-down docker-logs all
+.PHONY: help setup install assets-sync build start stop dev dev-client docker-build docker-up docker-down docker-logs all
 
 help:
 	@echo "game-rpg — local commands"
@@ -13,6 +13,7 @@ help:
 	@echo "  make assets-sync  copy repo assets/ -> apps/client/public/assets/"
 	@echo "  make build        Vite production build (client)"
 	@echo "  make start        Express static server (needs apps/client/dist)"
+	@echo "  make stop         kill process listening on PORT from .env (default 3000)"
 	@echo "  make dev          Vite dev server (client)"
 	@echo "  make dev-client   same as dev"
 	@echo "  make all          setup + install + assets-sync + build + start"
@@ -40,6 +41,17 @@ build: install assets-sync
 
 start:
 	@bash -lc 'set -a; [[ -f .env ]] && source .env; set +a; cd apps/server && node index.js'
+
+stop:
+	@bash -lc 'set -a; [[ -f "$(PROJECT_ROOT)/.env" ]] && source "$(PROJECT_ROOT)/.env"; set +a; P=$${PORT:-3000}; \
+	  PIDS=$$(lsof -tiTCP:$$P -sTCP:LISTEN 2>/dev/null || true); \
+	  if [[ -z "$$PIDS" ]]; then echo "stop: nothing listening on TCP port $$P"; exit 0; fi; \
+	  echo "stop: sending SIGTERM to PID(s) on port $$P: $$PIDS"; \
+	  kill $$PIDS 2>/dev/null || true; \
+	  sleep 0.3; \
+	  PIDS2=$$(lsof -tiTCP:$$P -sTCP:LISTEN 2>/dev/null || true); \
+	  if [[ -n "$$PIDS2" ]]; then echo "stop: still listening, sending SIGKILL to $$PIDS2"; kill -9 $$PIDS2 2>/dev/null || true; fi; \
+	  echo "stop: port $$P should be free"'
 
 dev dev-client: install assets-sync
 	@bash -lc 'set -a; [[ -f .env ]] && source .env; set +a; cd apps/client && npm run dev'

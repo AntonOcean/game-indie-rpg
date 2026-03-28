@@ -3,11 +3,13 @@
   "private": true,
   "workspaces": [
     "apps/client",
-    "apps/server"
+    "apps/server",
+    "packages/protocol"
   ],
   "scripts": {
     "dev:client": "npm run dev -w game-rpg-client",
     "build:client": "npm run build -w game-rpg-client",
+    "build": "npm run build:client",
     "start:server": "npm run start -w game-rpg-server"
   }
 }

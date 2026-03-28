@@ -12,10 +12,10 @@ Run-01–02: клиент с Pixi и dev-сборкой.
 
 ## Задачи (чек-лист)
 
-- [ ] После загрузки скрипта TWA вызвать `Telegram.WebApp.ready()` и `Telegram.WebApp.expand()`.
-- [ ] CSS: контейнер игры `width/height` 100% или `100dvh`; при необходимости `env(safe-area-inset-*)` для будущего UI.
-- [ ] Подписка на изменение viewport (`viewportChanged` или resize окна / `visualViewport`) — обновлять размер приложения Pixi (`resizeTo` или ручной `renderer.resize`).
-- [ ] Убедиться, что при первом открытии нет «прыгающей» высоты из-за адресной строки (в разумных пределах среды TWA).
+- [x] После загрузки скрипта TWA вызвать `Telegram.WebApp.ready()` и `Telegram.WebApp.expand()`.
+- [x] CSS: контейнер игры `width/height` 100% или `100dvh`; при необходимости `env(safe-area-inset-*)` для будущего UI.
+- [x] Подписка на изменение viewport (`viewportChanged` или resize окна / `visualViewport`) — обновлять размер приложения Pixi (`resizeTo` или ручной `renderer.resize`).
+- [x] Убедиться, что при первом открытии нет «прыгающей» высоты из-за адресной строки (в разумных пределах среды TWA).
 
 ## Ограничения
 

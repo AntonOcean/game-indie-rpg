@@ -1,0 +1,12 @@
+# game-rpg
+
+MVP 2D RPG для Telegram Web Apps (см. `docs/architecture.md`, `docs/implementation-plan.md`).
+
+## Разработка и прод
+
+- **Локальная разработка клиента:** `npm run dev:client` — Vite (по умолчанию порт из `CLIENT_DEV_PORT` или 5173). Сервер для этого не обязателен.
+- **Продакшен-статика:** `npm run build` собирает клиент в `apps/client/dist`. Затем `npm run start:server` поднимает Express на порту **3000** и раздаёт файлы из этого `dist`. Проверка живости: `GET /health` → `{ "ok": true }`.
+
+Переменная **`CLIENT_DIST_PATH`** (опционально) переопределяет каталог со статикой; иначе используется `apps/client/dist`.
+
+Общие типы игрового протокола (`MOVE`, `ATTACK`, `USE_ITEM`) — пакет `packages/protocol` (`game-rpg-protocol`); отправка с клиента пока заглушка и не требует запущенного сервера.
