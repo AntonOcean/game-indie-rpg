@@ -37,6 +37,10 @@ async function main(): Promise<void> {
     return;
   }
 
+  host.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+  });
+
   initTelegramWebAppOnce();
 
   const app = new Application();
