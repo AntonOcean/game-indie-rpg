@@ -1,0 +1,13 @@
+{
+  "name": "game-rpg",
+  "private": true,
+  "workspaces": [
+    "apps/client",
+    "apps/server"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev -w game-rpg-client",
+    "build:client": "npm run build -w game-rpg-client",
+    "start:server": "npm run start -w game-rpg-server"
+  }
+}

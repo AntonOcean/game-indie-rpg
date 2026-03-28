@@ -1,0 +1,8 @@
+.env
+.idea
+node_modules/
+dist/
+apps/client/public/assets/
+full-assets
+*.log
+.DS_Store
