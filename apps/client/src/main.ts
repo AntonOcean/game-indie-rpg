@@ -2,16 +2,20 @@ import "./style.css";
 import "./protocol";
 import { Application } from "pixi.js";
 import { createGameWorld } from "./ecs/createGameWorld";
+import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
+import { spawnEnemyEntity } from "./ecs/enemySpawn";
 import {
   deltaSecondsClamped,
   movePlayerWithTileCollisions,
   resolvePlayerIntentToVelocity,
 } from "./ecs/playerLocomotion";
+import { resolvePlayerAttack } from "./ecs/playerCombat";
 import { spawnPlayerEntity } from "./ecs/playerSpawn";
 import { Position } from "./ecs/components";
 import { loadGameMap } from "./gameMap";
 import { bindGameInput } from "./input/inputBindings";
 import { emptyPlayerIntent } from "./input/playerIntent";
+import { mountEnemyVisual } from "./render/mountEnemyVisual";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
 import { runRenderSystem } from "./render/renderSystem";
@@ -49,17 +53,26 @@ async function main(): Promise<void> {
   const playerRenderId = mountPlayerVisual(worldRoot, renderRegistry);
   const playerEid = spawnPlayerEntity(ecsWorld, playerRenderId, meta);
 
+  const enemyRenderId = mountEnemyVisual(worldRoot, renderRegistry);
+  spawnEnemyEntity(ecsWorld, enemyRenderId, meta);
+
   const intent = emptyPlayerIntent();
-  const input = bindGameInput(app, worldRoot, () => ({
-    x: Position.x[playerEid],
-    y: Position.y[playerEid],
-  }));
+  const input = bindGameInput(
+    app,
+    worldRoot,
+    () => ({
+      x: Position.x[playerEid],
+      y: Position.y[playerEid],
+    }),
+    (wx, wy) => pickEnemyAtWorld(ecsWorld, wx, wy)
+  );
 
   app.ticker.add(() => {
     const dtSec = deltaSecondsClamped(app.ticker.deltaMS);
     input.fillIntent(intent);
     resolvePlayerIntentToVelocity(playerEid, intent);
     movePlayerWithTileCollisions(playerEid, meta, dtSec);
+    resolvePlayerAttack(ecsWorld, playerEid, intent, performance.now());
     runRenderSystem(ecsWorld, renderRegistry);
     updateWorldCamera(
       worldRoot,

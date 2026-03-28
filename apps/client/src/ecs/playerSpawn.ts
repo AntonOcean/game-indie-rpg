@@ -1,6 +1,13 @@
 import { addComponent, addEntity, type World } from "bitecs";
 import type { GameMapMeta } from "../gameMap";
-import { Hitbox, Player, Position, RenderRef, Velocity } from "./components";
+import {
+  AttackCooldown,
+  Hitbox,
+  Player,
+  Position,
+  RenderRef,
+  Velocity,
+} from "./components";
 
 /** Центр тайла (tx, ty) с проходимым collisions=0 в текущей карте. */
 export const PLAYER_SPAWN_TILE = { tx: 12, ty: 10 } as const;
@@ -48,6 +55,9 @@ export function spawnPlayerEntity(
   addComponent(world, eid, Velocity);
   Velocity.vx[eid] = 0;
   Velocity.vy[eid] = 0;
+
+  addComponent(world, eid, AttackCooldown);
+  AttackCooldown.untilMs[eid] = 0;
 
   return eid;
 }

@@ -10,7 +10,7 @@ export type PlayerIntent = {
    * Мобила: удержание — пока палец на экране (см. inputBindings).
    */
   moveDirection: { x: number; y: number } | null;
-  /** Run-08: eid цели; здесь всегда null. */
+  /** eid цели атаки (bitECS) или null. */
   attackTarget: number | null;
 };
 

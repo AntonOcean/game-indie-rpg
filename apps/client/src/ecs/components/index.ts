@@ -3,3 +3,7 @@ export { Player } from "./player";
 export { RenderRef } from "./renderRef";
 export { Hitbox } from "./hitbox";
 export { Velocity } from "./velocity";
+export { Enemy } from "./enemy";
+export { Health } from "./health";
+export { AttackCooldown } from "./attackCooldown";
+export { Dead } from "./dead";

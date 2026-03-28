@@ -43,7 +43,9 @@ function normalizeDir(dx: number, dy: number): { x: number; y: number } | null {
 export function bindGameInput(
   app: Application,
   worldRoot: Container,
-  getPlayerWorldPos: () => { x: number; y: number }
+  getPlayerWorldPos: () => { x: number; y: number },
+  /** Мировые px → eid врага или -1 (run-08: hit-test перед движением по тапу). */
+  pickEnemyAtWorld: (worldX: number, worldY: number) => number
 ): InputBindingHandles {
   const keysDown = new Set<string>();
   let pointerMode = detectPointerMode();
@@ -61,6 +63,9 @@ export function bindGameInput(
   let pointerWorldY = 0;
 
   let desktopMoveGoal: { x: number; y: number } | null = null;
+
+  /** Следующий кадр: атака по eid после pointertap (приоритет над moveTo на десктопе). */
+  let pendingAttackTarget: number | null = null;
 
   const onKeyDown = (e: KeyboardEvent): void => {
     if (MOVE_KEYS.has(e.key)) {
@@ -102,8 +107,13 @@ export function bindGameInput(
   };
 
   const onPointerTap = (e: FederatedPointerEvent): void => {
+    const w = screenToWorld(e.globalX, e.globalY, worldRoot);
+    const enemyEid = pickEnemyAtWorld(w.x, w.y);
+    if (enemyEid >= 0) {
+      pendingAttackTarget = enemyEid;
+      return;
+    }
     if (pointerMode === "fine") {
-      const w = screenToWorld(e.globalX, e.globalY, worldRoot);
       desktopMoveGoal = { x: w.x, y: w.y };
     }
   };
@@ -125,9 +135,14 @@ export function bindGameInput(
   resizeObs?.observe(app.canvas);
 
   function fillIntent(out: PlayerIntent): void {
-    out.attackTarget = null;
     out.moveTo = null;
     out.moveDirection = null;
+    out.attackTarget = null;
+
+    if (pendingAttackTarget !== null) {
+      out.attackTarget = pendingAttackTarget;
+      pendingAttackTarget = null;
+    }
 
     const { x: px, y: py } = getPlayerWorldPos();
 
