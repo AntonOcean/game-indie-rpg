@@ -104,11 +104,11 @@
  "tilesets":[
         {
          "firstgid":1,
-         "source":"tilesets/TX Tileset Grass.tsx"
+         "source":"/assets/tilesets/TX Tileset Grass.tsx"
         }, 
         {
          "firstgid":65,
-         "source":"tilesets/TX Tileset Wall.tsx"
+         "source":"/assets/tilesets/TX Tileset Wall.tsx"
         }],
  "tilewidth":32,
  "type":"map",
