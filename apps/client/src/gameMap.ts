@@ -150,6 +150,10 @@ export type GameMapMeta = {
   mapHeight: number;
   tileWidth: number;
   tileHeight: number;
+  /** mapWidth * tileWidth — границы камеры в мировых пикселях. */
+  mapWidthPx: number;
+  /** mapHeight * tileHeight */
+  mapHeightPx: number;
 };
 
 export type LoadedGameMap = {
@@ -185,6 +189,8 @@ export async function loadGameMap(app: Application): Promise<LoadedGameMap> {
     mapHeight: mapData.height,
     tileWidth: mapData.tilewidth,
     tileHeight: mapData.tileheight,
+    mapWidthPx: mapData.width * mapData.tilewidth,
+    mapHeightPx: mapData.height * mapData.tileheight,
   };
 
   if (import.meta.env.DEV) {
@@ -194,6 +200,8 @@ export async function loadGameMap(app: Application): Promise<LoadedGameMap> {
       mapHeight: meta.mapHeight,
       tileWidth: meta.tileWidth,
       tileHeight: meta.tileHeight,
+      mapWidthPx: meta.mapWidthPx,
+      mapHeightPx: meta.mapHeightPx,
     });
   }
 

@@ -15,6 +15,11 @@ import { emptyPlayerIntent } from "./input/playerIntent";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
 import { runRenderSystem } from "./render/renderSystem";
+import {
+  applyWorldScale,
+  DEFAULT_WORLD_SCALE,
+  updateWorldCamera,
+} from "./camera/worldCamera";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
 
 async function main(): Promise<void> {
@@ -38,6 +43,7 @@ async function main(): Promise<void> {
   host.appendChild(app.canvas);
 
   const { meta, worldRoot } = await loadGameMap(app);
+  applyWorldScale(worldRoot, DEFAULT_WORLD_SCALE);
   const ecsWorld = createGameWorld();
   const renderRegistry = createRenderRegistry();
   const playerRenderId = mountPlayerVisual(worldRoot, renderRegistry);
@@ -55,6 +61,14 @@ async function main(): Promise<void> {
     resolvePlayerIntentToVelocity(playerEid, intent);
     movePlayerWithTileCollisions(playerEid, meta, dtSec);
     runRenderSystem(ecsWorld, renderRegistry);
+    updateWorldCamera(
+      worldRoot,
+      meta,
+      Position.x[playerEid],
+      Position.y[playerEid],
+      app.screen.width,
+      app.screen.height
+    );
   });
 
   subscribeViewportResize(() => {
