@@ -2,8 +2,16 @@ import "./style.css";
 import "./protocol";
 import { Application } from "pixi.js";
 import { createGameWorld } from "./ecs/createGameWorld";
+import {
+  deltaSecondsClamped,
+  movePlayerWithTileCollisions,
+  resolvePlayerIntentToVelocity,
+} from "./ecs/playerLocomotion";
 import { spawnPlayerEntity } from "./ecs/playerSpawn";
+import { Position } from "./ecs/components";
 import { loadGameMap } from "./gameMap";
+import { bindGameInput } from "./input/inputBindings";
+import { emptyPlayerIntent } from "./input/playerIntent";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
 import { runRenderSystem } from "./render/renderSystem";
@@ -33,13 +41,26 @@ async function main(): Promise<void> {
   const ecsWorld = createGameWorld();
   const renderRegistry = createRenderRegistry();
   const playerRenderId = mountPlayerVisual(worldRoot, renderRegistry);
-  spawnPlayerEntity(ecsWorld, playerRenderId, meta);
+  const playerEid = spawnPlayerEntity(ecsWorld, playerRenderId, meta);
+
+  const intent = emptyPlayerIntent();
+  const input = bindGameInput(app, worldRoot, () => ({
+    x: Position.x[playerEid],
+    y: Position.y[playerEid],
+  }));
 
   app.ticker.add(() => {
+    const dtSec = deltaSecondsClamped(app.ticker.deltaMS);
+    input.fillIntent(intent);
+    resolvePlayerIntentToVelocity(playerEid, intent);
+    movePlayerWithTileCollisions(playerEid, meta, dtSec);
     runRenderSystem(ecsWorld, renderRegistry);
   });
 
-  subscribeViewportResize(() => app.queueResize());
+  subscribeViewportResize(() => {
+    app.queueResize();
+    app.stage.hitArea = app.screen;
+  });
 }
 
 main().catch((err) => {
