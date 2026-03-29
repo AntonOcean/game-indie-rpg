@@ -33,6 +33,7 @@ import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
 import { createRenderAdapter } from "./render/renderAdapter";
 import type { RenderEvent } from "./render/renderEvent";
+import { createHpBarLayer } from "./render/hpBarLayer";
 import { runRenderSystem } from "./render/renderSystem";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
 
@@ -104,6 +105,7 @@ async function main(): Promise<void> {
 
   const debugOverlay = createDebugOverlay(worldRoot);
   bindDebugOverlayToggle(window, debugOverlay);
+  const hpBarLayer = createHpBarLayer(app.stage);
 
   const spawnLootAt = (wx: number, wy: number): void => {
     const lootRenderId = createLootVisualAt(worldRoot, renderRegistry, wx, wy);
@@ -162,6 +164,7 @@ async function main(): Promise<void> {
       app.screen.width,
       app.screen.height
     );
+    hpBarLayer.update(ecsWorld, worldRoot, playerEid);
     debugOverlay.update(ecsWorld, playerEid);
   });
 

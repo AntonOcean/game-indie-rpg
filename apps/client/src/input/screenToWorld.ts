@@ -12,3 +12,15 @@ export function screenToWorld(
 ): { x: number; y: number } {
   return worldRoot.toLocal({ x: globalX, y: globalY });
 }
+
+/**
+ * Мировые пиксели → координаты стейджа (после position/scale worldRoot, т.е. камера).
+ * Для screen-space UI: затем `Math.round` по осям — см. run-15 HP bars.
+ */
+export function worldToScreen(
+  worldX: number,
+  worldY: number,
+  worldRoot: Container
+): { x: number; y: number } {
+  return worldRoot.toGlobal({ x: worldX, y: worldY });
+}

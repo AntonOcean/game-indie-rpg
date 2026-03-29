@@ -18,6 +18,7 @@ export const PLAYER = {
   ATTACK_RANGE: 56,
   ATTACK_COOLDOWN_MS: 300,
   ATTACK_DAMAGE: 25,
+  MAX_HP: 100,
   VISUAL_SIZE: 24,
   VISUAL_COLOR: 0x3366ff,
 } as const;
@@ -39,6 +40,22 @@ export const CAMERA = {
   WORLD_SCALE: 1,
   /** Дополнительный отступ при clamp камеры к границам карты (мир, px). MVP: 0. */
   CLAMP_MARGIN: 0,
+} as const;
+
+/** Screen-space HP bars (run-15): не масштабируются камерой, snap к пикселю после worldToScreen. */
+export const HP_BAR = {
+  WIDTH: 40,
+  HEIGHT: 4,
+  /** Отступ вверх от верхнего края спрайта (мир, px), от центра сущности: см. hpBarLayer. */
+  OFFSET_Y: 6,
+  /** Фон полоски (серый). */
+  BG_COLOR: 0x3d3d4a,
+  COLOR_HIGH: 0x22c55e,
+  COLOR_MID: 0xeab308,
+  COLOR_LOW: 0xef4444,
+  /** Отступ HUD игрока от краёв экрана (stage px). */
+  HUD_MARGIN_X: 12,
+  HUD_MARGIN_Y: 12,
 } as const;
 
 export const ENGINE = {

@@ -3,6 +3,7 @@ import { PLAYER } from "../constants/gameBalance";
 import type { GameMapMeta } from "../gameMap";
 import {
   AttackCooldown,
+  Health,
   Hitbox,
   Player,
   Position,
@@ -58,6 +59,10 @@ export function spawnPlayerEntity(
 
   addComponent(world, eid, AttackCooldown);
   AttackCooldown.untilMs[eid] = 0;
+
+  addComponent(world, eid, Health);
+  Health.current[eid] = PLAYER.MAX_HP;
+  Health.max[eid] = PLAYER.MAX_HP;
 
   addCharacterAnimationFacing(world, eid, "soldier");
 
