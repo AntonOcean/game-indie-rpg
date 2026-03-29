@@ -1,13 +1,11 @@
-import { Graphics } from "pixi.js";
-import { ENEMY } from "../constants/gameBalance";
+import { Sprite, type Texture } from "pixi.js";
+import { characterSpriteWorldScale } from "../constants/characterAssets";
 
-/** Красный квадрат; центр = Position (как у игрока). */
-export function createEnemyGraphics(): Graphics {
-  const s = ENEMY.VISUAL_SIZE;
-  const half = s / 2;
-  const g = new Graphics();
-  g.rect(-half, -half, s, s).fill({
-    color: ENEMY.VISUAL_COLOR,
-  });
-  return g;
+/** Спрайт орка (первый кадр idle); центр = Position. */
+export function createEnemySprite(texture: Texture): Sprite {
+  const sprite = new Sprite(texture);
+  sprite.anchor.set(0.5, 0.5);
+  const s = characterSpriteWorldScale();
+  sprite.scale.set(s);
+  return sprite;
 }

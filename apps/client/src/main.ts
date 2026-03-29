@@ -22,6 +22,7 @@ import { loadGameMap } from "./gameMap";
 import { bindGameInput } from "./input/inputBindings";
 import { emptyPlayerIntent } from "./input/playerIntent";
 import { createLootVisualAt } from "./render/mountLootVisual";
+import { loadCharacterIdleTextures } from "./render/loadCharacterIdleTextures";
 import { mountEnemyVisual } from "./render/mountEnemyVisual";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
@@ -54,12 +55,21 @@ async function main(): Promise<void> {
 
   const { meta, worldRoot } = await loadGameMap(app);
   applyWorldScale(worldRoot, CAMERA.WORLD_SCALE);
+  const characterTextures = await loadCharacterIdleTextures();
   const ecsWorld = createGameWorld();
   const renderRegistry = createRenderRegistry();
-  const playerRenderId = mountPlayerVisual(worldRoot, renderRegistry);
+  const playerRenderId = mountPlayerVisual(
+    worldRoot,
+    renderRegistry,
+    characterTextures.soldierIdleFrame
+  );
   const playerEid = spawnPlayerEntity(ecsWorld, playerRenderId, meta);
 
-  const enemyRenderId = mountEnemyVisual(worldRoot, renderRegistry);
+  const enemyRenderId = mountEnemyVisual(
+    worldRoot,
+    renderRegistry,
+    characterTextures.orcIdleFrame
+  );
   spawnEnemyEntity(ecsWorld, enemyRenderId, meta);
 
   const intent = emptyPlayerIntent();

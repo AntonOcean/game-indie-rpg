@@ -2,6 +2,14 @@
  * Числовые константы баланса и визуала MVP (единая точка настройки).
  * См. docs/post-mvp-development-plan.md, run-11.
  */
+/**
+ * Визуальная высота спрайта юнита в мировых пикселях (кадр ассета масштабируется к этому размеру).
+ * Тайл карты 32×32 — берём 32, чтобы фигура читалась на сетке; хитбокс задаётся отдельно (PLAYER/ENEMY.HITBOX_SIZE).
+ */
+export const CHARACTER = {
+  SPRITE_WORLD_HEIGHT_PX: 32,
+} as const;
+
 export const PLAYER = {
   SPEED: 220,
   HITBOX_SIZE: 24,

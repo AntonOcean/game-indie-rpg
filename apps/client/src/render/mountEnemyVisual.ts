@@ -1,14 +1,15 @@
-import type { Container } from "pixi.js";
+import type { Container, Texture } from "pixi.js";
 import type { RenderRegistry } from "./renderRegistry";
-import { createEnemyGraphics } from "./enemyVisual";
+import { createEnemySprite } from "./enemyVisual";
 
 export function mountEnemyVisual(
   worldRoot: Container,
-  registry: RenderRegistry
+  registry: RenderRegistry,
+  idleTexture: Texture
 ): number {
   const renderId = registry.allocateId();
-  const graphics = createEnemyGraphics();
-  registry.nodes.set(renderId, graphics);
-  worldRoot.addChild(graphics);
+  const sprite = createEnemySprite(idleTexture);
+  registry.nodes.set(renderId, sprite);
+  worldRoot.addChild(sprite);
   return renderId;
 }

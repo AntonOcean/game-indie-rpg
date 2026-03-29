@@ -1,15 +1,13 @@
-import { Graphics } from "pixi.js";
-import { PLAYER } from "../constants/gameBalance";
+import { Sprite, type Texture } from "pixi.js";
+import { characterSpriteWorldScale } from "../constants/characterAssets";
 
 /**
- * Синий квадрат; геометрия от центра (совпадает с Position как центром сущности).
+ * Спрайт солдата (первый кадр idle); anchor в центре — как Position и AABB хитбокса.
  */
-export function createPlayerGraphics(): Graphics {
-  const s = PLAYER.VISUAL_SIZE;
-  const half = s / 2;
-  const g = new Graphics();
-  g.rect(-half, -half, s, s).fill({
-    color: PLAYER.VISUAL_COLOR,
-  });
-  return g;
+export function createPlayerSprite(texture: Texture): Sprite {
+  const sprite = new Sprite(texture);
+  sprite.anchor.set(0.5, 0.5);
+  const s = characterSpriteWorldScale();
+  sprite.scale.set(s);
+  return sprite;
 }
