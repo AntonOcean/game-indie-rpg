@@ -8,8 +8,11 @@
  * 5. combat — урон по цели, кулдаун (живые враги без `Dead`)
  * 6. death — `Health <= 0` → `Dead`, колбэк спавна лута в позиции врага
  * 7. loot_pickup — пересечение AABB игрока и лута → удаление сущности, id узла в очередь на destroy
- * 8. render_sync — destroy очереди, скрытие мёртвых врагов, синхрон позиций
- * 9. camera — worldRoot / clamp
+ * 8. locomotion_animation_intent — idle/walk в AnimationIntentBuffer
+ * 9. facing_from_velocity — Facing по Velocity (если не locked)
+ * 10. animation_system — FSM клипов, time += dt, очистка буфера
+ * 11. render_sync — destroy, мёртвые враги, позиции, кадры анимации, зеркало
+ * 12. camera — worldRoot / clamp
  */
 export const GAME_PIPELINE_ORDER = [
   "input_aggregate",
@@ -19,6 +22,9 @@ export const GAME_PIPELINE_ORDER = [
   "combat",
   "death",
   "loot_pickup",
+  "locomotion_animation_intent",
+  "facing_from_velocity",
+  "animation_system",
   "render_sync",
   "camera",
 ] as const;

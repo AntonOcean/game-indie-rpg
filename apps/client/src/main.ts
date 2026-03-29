@@ -16,13 +16,17 @@ import {
   resolvePlayerIntentToVelocity,
 } from "./ecs/playerLocomotion";
 import { resolvePlayerAttack } from "./ecs/playerCombat";
+import { runAnimationSystem } from "./ecs/animationSystem";
+import { updateFacingFromVelocity } from "./ecs/facingSystem";
+import { enqueueLocomotionAnimationRequests } from "./ecs/locomotionAnimationIntent";
 import { spawnPlayerEntity } from "./ecs/playerSpawn";
 import { Position } from "./ecs/components";
 import { loadGameMap } from "./gameMap";
 import { bindGameInput } from "./input/inputBindings";
 import { emptyPlayerIntent } from "./input/playerIntent";
+import { createAnimationIntentBuffer } from "./animation/animationIntentBuffer";
 import { createLootVisualAt } from "./render/mountLootVisual";
-import { loadCharacterIdleTextures } from "./render/loadCharacterIdleTextures";
+import { loadCharacterAnimationFrames } from "./render/loadCharacterAnimationTextures";
 import { mountEnemyVisual } from "./render/mountEnemyVisual";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
@@ -55,25 +59,31 @@ async function main(): Promise<void> {
 
   const { meta, worldRoot } = await loadGameMap(app);
   applyWorldScale(worldRoot, CAMERA.WORLD_SCALE);
-  const characterTextures = await loadCharacterIdleTextures();
+  const characterAnimFrames = await loadCharacterAnimationFrames();
   const ecsWorld = createGameWorld();
   const renderRegistry = createRenderRegistry();
   const playerRenderId = mountPlayerVisual(
     worldRoot,
     renderRegistry,
-    characterTextures.soldierIdleFrame
+    characterAnimFrames.soldier.idle[0]!
   );
   const playerEid = spawnPlayerEntity(ecsWorld, playerRenderId, meta);
 
   const enemyRenderId = mountEnemyVisual(
     worldRoot,
     renderRegistry,
-    characterTextures.orcIdleFrame
+    characterAnimFrames.orc.idle[0]!
   );
   spawnEnemyEntity(ecsWorld, enemyRenderId, meta);
 
   const intent = emptyPlayerIntent();
   const pendingDestroyRenderIds: number[] = [];
+  const animationIntentBuffer = createAnimationIntentBuffer();
+  const devAnimWarn = (msg: string): void => {
+    if (import.meta.env.DEV) {
+      console.warn(msg);
+    }
+  };
   let goldCount = 0;
   const goldHud = document.querySelector<HTMLDivElement>("#hud-gold");
 
@@ -116,7 +126,15 @@ async function main(): Promise<void> {
         goldHud.textContent = `Gold: ${goldCount}`;
       }
     }
-    runRenderSystem(ecsWorld, renderRegistry, pendingDestroyRenderIds);
+    enqueueLocomotionAnimationRequests(ecsWorld, animationIntentBuffer);
+    updateFacingFromVelocity(ecsWorld);
+    runAnimationSystem(ecsWorld, animationIntentBuffer, dtSec, devAnimWarn);
+    runRenderSystem(
+      ecsWorld,
+      renderRegistry,
+      pendingDestroyRenderIds,
+      characterAnimFrames
+    );
     updateWorldCamera(
       worldRoot,
       meta,

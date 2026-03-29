@@ -9,6 +9,7 @@ import {
   RenderRef,
   Velocity,
 } from "./components";
+import { addCharacterAnimationFacing } from "./initCharacterVisualAnimation";
 
 /** Центр тайла (tx, ty) с проходимым collisions=0 в текущей карте. */
 export const PLAYER_SPAWN_TILE = { tx: 12, ty: 10 } as const;
@@ -57,6 +58,8 @@ export function spawnPlayerEntity(
 
   addComponent(world, eid, AttackCooldown);
   AttackCooldown.untilMs[eid] = 0;
+
+  addCharacterAnimationFacing(world, eid, "soldier");
 
   return eid;
 }

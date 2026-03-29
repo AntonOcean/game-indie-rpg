@@ -7,8 +7,12 @@ import { CHARACTER } from "./gameBalance";
 export const CHARACTER_SHEET = {
   FRAME_PX: 100,
   IDLE_FRAME_COUNT: 6,
+  /** Горизонтальный лист walk (как idle); при другом числе кадров поправить и animationClips. */
+  WALK_FRAME_COUNT: 6,
   SOLDIER_IDLE_URL: "/assets/characters/soldier/Soldier-Idle.png",
   ORC_IDLE_URL: "/assets/characters/orc/Orc-Idle.png",
+  SOLDIER_WALK_URL: "/assets/characters/soldier/Soldier-Walk.png",
+  ORC_WALK_URL: "/assets/characters/orc/Orc-Walk.png",
 } as const;
 
 /** Масштаб кадра 100×100 → высота в мире `CHARACTER.SPRITE_WORLD_HEIGHT_PX` (как тайл 32). */

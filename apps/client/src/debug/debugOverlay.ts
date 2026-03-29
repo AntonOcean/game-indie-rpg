@@ -1,6 +1,7 @@
 import { query, hasComponent, type World } from "bitecs";
 import { Container, Graphics, Text, type Container as PixiContainer } from "pixi.js";
-import { Dead, Enemy, Health, Hitbox, Position } from "../ecs/components";
+import { animStateLabel } from "../animation/animationTypes";
+import { Animation, Dead, Enemy, Health, Hitbox, Player, Position } from "../ecs/components";
 
 const HITBOX_FILL = { color: 0x44ff88, alpha: 0.14 } as const;
 const HITBOX_STROKE = { width: 1, color: 0x66ffaa, alpha: 0.85 } as const;
@@ -50,6 +51,19 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
   root.addChild(playerPosText);
 
   const enemyHpPool: Text[] = [];
+  const animLabelPool: Text[] = [];
+
+  function ensureAnimLabel(index: number): Text {
+    let t = animLabelPool[index];
+    if (!t) {
+      t = new Text({ text: "", style: labelStyle });
+      t.eventMode = "none";
+      t.anchor.set(0.5, 0);
+      animLabelPool.push(t);
+      root.addChild(t);
+    }
+    return t;
+  }
 
   function ensureEnemyHpLabel(index: number): Text {
     let t = enemyHpPool[index];
@@ -120,6 +134,28 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
       }
       for (let j = hpIndex; j < enemyHpPool.length; j++) {
         enemyHpPool[j]!.visible = false;
+      }
+
+      let animIndex = 0;
+      const withAnim = query(world, [Animation, Position, Hitbox]);
+      for (let i = 0; i < withAnim.length; i++) {
+        const eid = withAnim[i]!;
+        if (!hasComponent(world, eid, Player) && !hasComponent(world, eid, Enemy)) {
+          continue;
+        }
+        if (hasComponent(world, eid, Dead)) {
+          continue;
+        }
+        const label = ensureAnimLabel(animIndex++);
+        label.text = `anim: ${animStateLabel(Animation.state[eid])}`;
+        const cx = Position.x[eid];
+        const cy = Position.y[eid];
+        const hh = Hitbox.height[eid] / 2;
+        label.position.set(cx, cy + hh + 6);
+        label.visible = true;
+      }
+      for (let j = animIndex; j < animLabelPool.length; j++) {
+        animLabelPool[j]!.visible = false;
       }
     },
 

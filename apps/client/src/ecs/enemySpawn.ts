@@ -2,6 +2,7 @@ import { addComponent, addEntity, type World } from "bitecs";
 import { ENEMY } from "../constants/gameBalance";
 import type { GameMapMeta } from "../gameMap";
 import { Enemy, Health, Hitbox, Position, RenderRef } from "./components";
+import { addCharacterAnimationFacing } from "./initCharacterVisualAnimation";
 import { tileCenterWorldPx } from "./playerSpawn";
 
 /** Предпочтительная клетка врага; при блоке ищется ближайшая проходимая (BFS). */
@@ -68,6 +69,8 @@ export function spawnEnemyEntity(
   addComponent(world, eid, Health);
   Health.current[eid] = ENEMY.HP;
   Health.max[eid] = ENEMY.HP;
+
+  addCharacterAnimationFacing(world, eid, "orc");
 
   return eid;
 }

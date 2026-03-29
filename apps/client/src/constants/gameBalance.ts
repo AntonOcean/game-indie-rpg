@@ -45,3 +45,8 @@ export const ENGINE = {
   /** Верхняя граница dt одного кадра (сек). */
   DT_MAX_SEC: 0.1,
 } as const;
+
+/** Визуальный FSM: при битом state / нет клипа → idle (число = AnimState.Idle). */
+export const ANIMATION = {
+  DEFAULT_STATE: 0,
+} as const;

@@ -1,8 +1,10 @@
 import { createWorld, registerComponents, type World } from "bitecs";
 import {
+  Animation,
   AttackCooldown,
   Dead,
   Enemy,
+  Facing,
   Health,
   Hitbox,
   Loot,
@@ -25,6 +27,8 @@ export function createGameWorld(): World {
     AttackCooldown,
     Dead,
     Loot,
+    Animation,
+    Facing,
   ]);
   return world;
 }
