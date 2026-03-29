@@ -1,4 +1,5 @@
 import { addComponent, addEntity, type World } from "bitecs";
+import { PLAYER } from "../constants/gameBalance";
 import type { GameMapMeta } from "../gameMap";
 import {
   AttackCooldown,
@@ -11,8 +12,6 @@ import {
 
 /** Центр тайла (tx, ty) с проходимым collisions=0 в текущей карте. */
 export const PLAYER_SPAWN_TILE = { tx: 12, ty: 10 } as const;
-
-export const PLAYER_HITBOX_PX = 24;
 
 export function tileCenterWorldPx(
   tx: number,
@@ -49,8 +48,8 @@ export function spawnPlayerEntity(
   RenderRef.renderId[eid] = renderId;
 
   addComponent(world, eid, Hitbox);
-  Hitbox.width[eid] = PLAYER_HITBOX_PX;
-  Hitbox.height[eid] = PLAYER_HITBOX_PX;
+  Hitbox.width[eid] = PLAYER.HITBOX_SIZE;
+  Hitbox.height[eid] = PLAYER.HITBOX_SIZE;
 
   addComponent(world, eid, Velocity);
   Velocity.vx[eid] = 0;

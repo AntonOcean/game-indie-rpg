@@ -1,0 +1,150 @@
+import { query, hasComponent, type World } from "bitecs";
+import { Container, Graphics, Text, type Container as PixiContainer } from "pixi.js";
+import { Dead, Enemy, Health, Hitbox, Position } from "../ecs/components";
+
+const HITBOX_FILL = { color: 0x44ff88, alpha: 0.14 } as const;
+const HITBOX_STROKE = { width: 1, color: 0x66ffaa, alpha: 0.85 } as const;
+
+const labelStyle = {
+  fontFamily: "system-ui, sans-serif",
+  fontSize: 11,
+  fill: 0xffffff,
+  stroke: { color: 0x000000, width: 3 },
+} as const;
+
+export type DebugOverlay = {
+  readonly root: PixiContainer;
+  setVisible(visible: boolean): void;
+  toggle(): void;
+  update(world: World, playerEid: number): void;
+  dispose(): void;
+};
+
+/**
+ * Слой отладки в координатах мира (дочерний к worldRoot): хитбоксы, HP врагов, позиция игрока.
+ * Только чтение ECS; переключение по клавише D — снаружи (main).
+ */
+export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
+  const root = new Container();
+  root.visible = false;
+  root.eventMode = "none";
+  worldRoot.addChild(root);
+
+  function bringToFront(): void {
+    const n = worldRoot.children.length;
+    if (n > 0) {
+      worldRoot.setChildIndex(root, n - 1);
+    }
+  }
+
+  const hitGfx = new Graphics();
+  hitGfx.eventMode = "none";
+  root.addChild(hitGfx);
+
+  const playerPosText = new Text({
+    text: "",
+    style: labelStyle,
+  });
+  playerPosText.eventMode = "none";
+  playerPosText.anchor.set(0, 0.5);
+  root.addChild(playerPosText);
+
+  const enemyHpPool: Text[] = [];
+
+  function ensureEnemyHpLabel(index: number): Text {
+    let t = enemyHpPool[index];
+    if (!t) {
+      t = new Text({ text: "", style: labelStyle });
+      t.eventMode = "none";
+      t.anchor.set(0.5, 1);
+      enemyHpPool.push(t);
+      root.addChild(t);
+    }
+    return t;
+  }
+
+  return {
+    root,
+
+    setVisible(visible: boolean): void {
+      root.visible = visible;
+    },
+
+    toggle(): void {
+      root.visible = !root.visible;
+    },
+
+    update(world: World, playerEid: number): void {
+      if (!root.visible) {
+        return;
+      }
+
+      bringToFront();
+
+      hitGfx.clear();
+
+      const withHitbox = query(world, [Position, Hitbox]);
+      for (let i = 0; i < withHitbox.length; i++) {
+        const eid = withHitbox[i];
+        const cx = Position.x[eid];
+        const cy = Position.y[eid];
+        const hw = Hitbox.width[eid] / 2;
+        const hh = Hitbox.height[eid] / 2;
+        const left = cx - hw;
+        const top = cy - hh;
+        hitGfx
+          .rect(left, top, Hitbox.width[eid], Hitbox.height[eid])
+          .fill(HITBOX_FILL)
+          .stroke(HITBOX_STROKE);
+      }
+
+      const px = Position.x[playerEid];
+      const py = Position.y[playerEid];
+      playerPosText.text = `x: ${px.toFixed(0)}  y: ${py.toFixed(0)}`;
+      playerPosText.position.set(px + 16, py);
+
+      let hpIndex = 0;
+      const enemies = query(world, [Enemy, Health, Position, Hitbox]);
+      for (let i = 0; i < enemies.length; i++) {
+        const eid = enemies[i];
+        if (hasComponent(world, eid, Dead)) {
+          continue;
+        }
+        const t = ensureEnemyHpLabel(hpIndex++);
+        t.text = `${Health.current[eid]}/${Health.max[eid]}`;
+        const cx = Position.x[eid];
+        const cy = Position.y[eid];
+        const hh = Hitbox.height[eid] / 2;
+        t.position.set(cx, cy - hh - 4);
+        t.visible = true;
+      }
+      for (let j = hpIndex; j < enemyHpPool.length; j++) {
+        enemyHpPool[j]!.visible = false;
+      }
+    },
+
+    dispose(): void {
+      worldRoot.removeChild(root);
+      root.destroy({ children: true });
+    },
+  };
+}
+
+/** Подписка на D / Shift+D не нужна — одна клавиша D. */
+export function bindDebugOverlayToggle(
+  target: Window,
+  overlay: DebugOverlay
+): () => void {
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== "d" && e.key !== "D") {
+      return;
+    }
+    if (e.repeat) {
+      return;
+    }
+    e.preventDefault();
+    overlay.toggle();
+  };
+  target.addEventListener("keydown", onKeyDown);
+  return () => target.removeEventListener("keydown", onKeyDown);
+}

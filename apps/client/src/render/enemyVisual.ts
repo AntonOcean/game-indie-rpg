@@ -1,13 +1,13 @@
 import { Graphics } from "pixi.js";
-
-const ENEMY_SQUARE_PX = 24;
+import { ENEMY } from "../constants/gameBalance";
 
 /** Красный квадрат; центр = Position (как у игрока). */
 export function createEnemyGraphics(): Graphics {
-  const half = ENEMY_SQUARE_PX / 2;
+  const s = ENEMY.VISUAL_SIZE;
+  const half = s / 2;
   const g = new Graphics();
-  g.rect(-half, -half, ENEMY_SQUARE_PX, ENEMY_SQUARE_PX).fill({
-    color: 0xcc3333,
+  g.rect(-half, -half, s, s).fill({
+    color: ENEMY.VISUAL_COLOR,
   });
   return g;
 }

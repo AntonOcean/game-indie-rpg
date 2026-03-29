@@ -1,9 +1,6 @@
 import { addComponent, addEntity, type World } from "bitecs";
+import { LOOT } from "../constants/gameBalance";
 import { Hitbox, Loot, Position, RenderRef } from "./components";
-import { PLAYER_HITBOX_PX } from "./playerSpawn";
-
-/** Хитбокс лута совпадает с масштабом игрока (MVP). */
-const LOOT_HITBOX_PX = PLAYER_HITBOX_PX;
 
 export function spawnLootEntity(
   world: World,
@@ -19,7 +16,7 @@ export function spawnLootEntity(
   addComponent(world, eid, RenderRef);
   RenderRef.renderId[eid] = renderId;
   addComponent(world, eid, Hitbox);
-  Hitbox.width[eid] = LOOT_HITBOX_PX;
-  Hitbox.height[eid] = LOOT_HITBOX_PX;
+  Hitbox.width[eid] = LOOT.HITBOX_SIZE;
+  Hitbox.height[eid] = LOOT.HITBOX_SIZE;
   return eid;
 }

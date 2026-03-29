@@ -1,13 +1,13 @@
 import { Graphics } from "pixi.js";
-
-const LOOT_SQUARE_PX = 20;
+import { LOOT } from "../constants/gameBalance";
 
 /** Жёлтый квадрат «монета»; центр = Position. */
 export function createLootGraphics(): Graphics {
-  const half = LOOT_SQUARE_PX / 2;
+  const s = LOOT.VISUAL_SIZE;
+  const half = s / 2;
   const g = new Graphics();
-  g.rect(-half, -half, LOOT_SQUARE_PX, LOOT_SQUARE_PX).fill({
-    color: 0xe6c200,
+  g.rect(-half, -half, s, s).fill({
+    color: LOOT.VISUAL_COLOR,
   });
   return g;
 }

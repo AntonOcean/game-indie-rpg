@@ -1,7 +1,8 @@
 import { addComponent, addEntity, type World } from "bitecs";
+import { ENEMY } from "../constants/gameBalance";
 import type { GameMapMeta } from "../gameMap";
 import { Enemy, Health, Hitbox, Position, RenderRef } from "./components";
-import { PLAYER_HITBOX_PX, tileCenterWorldPx } from "./playerSpawn";
+import { tileCenterWorldPx } from "./playerSpawn";
 
 /** Предпочтительная клетка врага; при блоке ищется ближайшая проходимая (BFS). */
 const ENEMY_SPAWN_PREFERRED_TILE = { tx: 20, ty: 10 } as const;
@@ -39,8 +40,6 @@ export function pickWalkableSpawnTile(
   throw new Error("game-rpg: no walkable tile for enemy spawn");
 }
 
-export const ENEMY_MAX_HP = 100;
-
 export function spawnEnemyEntity(
   world: World,
   renderId: number,
@@ -63,12 +62,12 @@ export function spawnEnemyEntity(
   RenderRef.renderId[eid] = renderId;
 
   addComponent(world, eid, Hitbox);
-  Hitbox.width[eid] = PLAYER_HITBOX_PX;
-  Hitbox.height[eid] = PLAYER_HITBOX_PX;
+  Hitbox.width[eid] = ENEMY.HITBOX_SIZE;
+  Hitbox.height[eid] = ENEMY.HITBOX_SIZE;
 
   addComponent(world, eid, Health);
-  Health.current[eid] = ENEMY_MAX_HP;
-  Health.max[eid] = ENEMY_MAX_HP;
+  Health.current[eid] = ENEMY.HP;
+  Health.max[eid] = ENEMY.HP;
 
   return eid;
 }

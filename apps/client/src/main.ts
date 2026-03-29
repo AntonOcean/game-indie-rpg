@@ -1,17 +1,20 @@
 import "./style.css";
 import "./protocol";
 import { Application } from "pixi.js";
+import { applyWorldScale, updateWorldCamera } from "./camera/worldCamera";
+import { CAMERA } from "./constants/gameBalance";
+import { bindDebugOverlayToggle, createDebugOverlay } from "./debug/debugOverlay";
 import { createGameWorld } from "./ecs/createGameWorld";
 import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
 import { spawnEnemyEntity } from "./ecs/enemySpawn";
+import { processEnemyDeath } from "./ecs/enemyDeath";
+import { processLootPickup } from "./ecs/lootPickup";
+import { spawnLootEntity } from "./ecs/lootSpawn";
 import {
   deltaSecondsClamped,
   movePlayerWithTileCollisions,
   resolvePlayerIntentToVelocity,
 } from "./ecs/playerLocomotion";
-import { processEnemyDeath } from "./ecs/enemyDeath";
-import { processLootPickup } from "./ecs/lootPickup";
-import { spawnLootEntity } from "./ecs/lootSpawn";
 import { resolvePlayerAttack } from "./ecs/playerCombat";
 import { spawnPlayerEntity } from "./ecs/playerSpawn";
 import { Position } from "./ecs/components";
@@ -23,11 +26,6 @@ import { mountEnemyVisual } from "./render/mountEnemyVisual";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
 import { createRenderRegistry } from "./render/renderRegistry";
 import { runRenderSystem } from "./render/renderSystem";
-import {
-  applyWorldScale,
-  DEFAULT_WORLD_SCALE,
-  updateWorldCamera,
-} from "./camera/worldCamera";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
 
 async function main(): Promise<void> {
@@ -55,7 +53,7 @@ async function main(): Promise<void> {
   host.appendChild(app.canvas);
 
   const { meta, worldRoot } = await loadGameMap(app);
-  applyWorldScale(worldRoot, DEFAULT_WORLD_SCALE);
+  applyWorldScale(worldRoot, CAMERA.WORLD_SCALE);
   const ecsWorld = createGameWorld();
   const renderRegistry = createRenderRegistry();
   const playerRenderId = mountPlayerVisual(worldRoot, renderRegistry);
@@ -78,6 +76,9 @@ async function main(): Promise<void> {
     }),
     (wx, wy) => pickEnemyAtWorld(ecsWorld, wx, wy)
   );
+
+  const debugOverlay = createDebugOverlay(worldRoot);
+  bindDebugOverlayToggle(window, debugOverlay);
 
   app.ticker.add(() => {
     const dtSec = deltaSecondsClamped(app.ticker.deltaMS);
@@ -114,6 +115,7 @@ async function main(): Promise<void> {
       app.screen.width,
       app.screen.height
     );
+    debugOverlay.update(ecsWorld, playerEid);
   });
 
   subscribeViewportResize(() => {

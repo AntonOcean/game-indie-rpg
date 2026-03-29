@@ -1,8 +1,6 @@
 import type { Container } from "pixi.js";
+import { CAMERA } from "../constants/gameBalance";
 import type { GameMapMeta } from "../gameMap";
-
-/** Равномерный масштаб мира (= worldRoot.scale.x при одинаковых осях). */
-export const DEFAULT_WORLD_SCALE = 1;
 
 export function applyWorldScale(worldRoot: Container, scale: number): void {
   worldRoot.scale.set(scale, scale);
@@ -11,13 +9,16 @@ export function applyWorldScale(worldRoot: Container, scale: number): void {
 function clampCameraAxis(
   player: number,
   viewSize: number,
-  mapSizePx: number
+  mapSizePx: number,
+  margin: number
 ): number {
   if (mapSizePx <= viewSize) {
     return (mapSizePx - viewSize) / 2;
   }
   const desired = player - viewSize / 2;
-  return Math.min(Math.max(desired, 0), mapSizePx - viewSize);
+  const minCam = margin;
+  const maxCam = mapSizePx - viewSize - margin;
+  return Math.min(Math.max(desired, minCam), maxCam);
 }
 
 /**
@@ -36,8 +37,9 @@ export function updateWorldCamera(
   const viewW = screenW / worldScale;
   const viewH = screenH / worldScale;
 
-  const camX = clampCameraAxis(playerX, viewW, meta.mapWidthPx);
-  const camY = clampCameraAxis(playerY, viewH, meta.mapHeightPx);
+  const m = CAMERA.CLAMP_MARGIN;
+  const camX = clampCameraAxis(playerX, viewW, meta.mapWidthPx, m);
+  const camY = clampCameraAxis(playerY, viewH, meta.mapHeightPx, m);
 
   worldRoot.position.set(-camX * worldScale, -camY * worldScale);
 }

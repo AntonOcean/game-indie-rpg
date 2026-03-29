@@ -3,6 +3,7 @@ import type {
   Container,
   FederatedPointerEvent,
 } from "pixi.js";
+import { PLAYER } from "../constants/gameBalance";
 import { screenToWorld } from "./screenToWorld";
 import type { PlayerIntent } from "./playerIntent";
 
@@ -176,7 +177,7 @@ export function bindGameInput(
 
     if (desktopMoveGoal) {
       const d = Math.hypot(desktopMoveGoal.x - px, desktopMoveGoal.y - py);
-      if (d < 5) {
+      if (d < PLAYER.MOVE_TO_STOP_PX) {
         desktopMoveGoal = null;
       } else {
         out.moveTo = { x: desktopMoveGoal.x, y: desktopMoveGoal.y };
