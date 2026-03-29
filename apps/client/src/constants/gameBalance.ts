@@ -61,6 +61,8 @@ export const HP_BAR = {
 export const ENGINE = {
   /** Верхняя граница dt одного кадра (сек). */
   DT_MAX_SEC: 0.1,
+  /** Очистка processedEvents по tickId не каждый кадр (run-16). */
+  PROCESSED_EVENTS_CLEANUP_EVERY_TICKS: 30,
 } as const;
 
 /** Визуальный FSM: при битом state / нет клипа → idle (число = AnimState.Idle). */

@@ -58,7 +58,7 @@ export function spawnPlayerEntity(
   Velocity.vy[eid] = 0;
 
   addComponent(world, eid, AttackCooldown);
-  AttackCooldown.untilMs[eid] = 0;
+  AttackCooldown.untilSec[eid] = 0;
 
   addComponent(world, eid, Health);
   Health.current[eid] = PLAYER.MAX_HP;

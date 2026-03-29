@@ -10,7 +10,10 @@ import {
   type AnimationIntentBuffer,
 } from "../animation/animationIntentBuffer";
 import { PLAYER } from "../constants/gameBalance";
+import type { AttackIntent } from "../events/attackIntent";
+import type { GameEventQueues } from "../events/gameEventQueues";
 import type { PlayerIntent } from "../input/playerIntent";
+import type { GameTime } from "./gameTime";
 import {
   AttackCooldown,
   Dead,
@@ -19,69 +22,95 @@ import {
   Position,
 } from "./components";
 
+const ATTACK_COOLDOWN_SEC = PLAYER.ATTACK_COOLDOWN_MS / 1000;
+
 /**
- * Урон только если одновременно (implementation-plan §5, architecture.md):
- * 1) задано намерение attackTarget;
- * 2) цель имеет компонент Enemy;
- * 3) цель жива: нет Dead и Health.current &gt; 0;
- * 4) дистанция от игрока до цели &lt; PLAYER.ATTACK_RANGE;
- * 5) кулдаун атаки истёк (untilMs === 0 или now &gt;= untilMs).
+ * Из PlayerIntent: если задан attackTarget — одно намерение удара (позиция источника из мира).
  */
-export function resolvePlayerAttack(
+export function collectPlayerAttackIntents(
   world: World,
   playerEid: number,
   intent: PlayerIntent,
-  nowMs: number,
-  animationBuffer: AnimationIntentBuffer
+  out: AttackIntent[]
 ): void {
   const target = intent.attackTarget;
   if (target === null) {
     return;
   }
-
   if (!hasComponent(world, target, Enemy)) {
     return;
   }
-
-  if (hasComponent(world, target, Dead)) {
-    return;
-  }
-
-  if (!hasComponent(world, target, Health)) {
-    return;
-  }
-
-  if (Health.current[target] <= 0) {
-    return;
-  }
-
-  const until = AttackCooldown.untilMs[playerEid];
-  if (until > 0 && nowMs < until) {
-    return;
-  }
-
-  const dx = Position.x[playerEid] - Position.x[target];
-  const dy = Position.y[playerEid] - Position.y[target];
-  const dist = Math.hypot(dx, dy);
-  if (dist >= PLAYER.ATTACK_RANGE) {
-    return;
-  }
-
-  Health.current[target] -= PLAYER.ATTACK_DAMAGE;
-  AttackCooldown.untilMs[playerEid] = nowMs + PLAYER.ATTACK_COOLDOWN_MS;
-
-  mergeAnimationIntent(animationBuffer, {
-    entity: playerEid,
-    state: AnimState.Attack,
+  out.push({
+    sourceId: playerEid,
+    targetId: target,
+    sourceX: Position.x[playerEid],
+    sourceY: Position.y[playerEid],
   });
+}
 
-  const payload: AttackPayload = { targetId: target };
-  sendPlayerEvent({ type: PlayerEventType.ATTACK, payload });
+/**
+ * Конвейер: AttackIntent → валидация → emitDamage (без прямой мутации Health).
+ * Кулдаун, ATTACK в протокол, анимация атаки — как раньше.
+ */
+export function resolveCombatAndEmitDamage(
+  world: World,
+  gameTime: GameTime,
+  queues: GameEventQueues,
+  intents: readonly AttackIntent[],
+  animationBuffer: AnimationIntentBuffer
+): void {
+  for (let i = 0; i < intents.length; i++) {
+    const it = intents[i]!;
+    const playerEid = it.sourceId;
+    const target = it.targetId;
 
-  if (import.meta.env.DEV) {
-    console.info("[game-rpg] hit enemy", {
-      target,
-      hp: Health.current[target],
+    if (!hasComponent(world, target, Enemy)) {
+      continue;
+    }
+    if (hasComponent(world, target, Dead)) {
+      continue;
+    }
+    if (!hasComponent(world, target, Health)) {
+      continue;
+    }
+    if (Health.current[target] <= 0) {
+      continue;
+    }
+
+    const until = AttackCooldown.untilSec[playerEid] ?? 0;
+    if (until > 0 && gameTime.now < until) {
+      continue;
+    }
+
+    const dx = Position.x[playerEid] - Position.x[target];
+    const dy = Position.y[playerEid] - Position.y[target];
+    const dist = Math.hypot(dx, dy);
+    if (dist >= PLAYER.ATTACK_RANGE) {
+      continue;
+    }
+
+    const dmg = queues.emitDamage({
+      tickId: gameTime.tickId,
+      sourceType: "entity",
+      sourceId: playerEid,
+      targetId: target,
+      amount: PLAYER.ATTACK_DAMAGE,
+      sourceX: it.sourceX,
+      sourceY: it.sourceY,
     });
+
+    AttackCooldown.untilSec[playerEid] = gameTime.now + ATTACK_COOLDOWN_SEC;
+
+    mergeAnimationIntent(animationBuffer, {
+      entity: playerEid,
+      state: AnimState.Attack,
+    });
+
+    const payload: AttackPayload = { targetId: target };
+    sendPlayerEvent({ type: PlayerEventType.ATTACK, payload });
+
+    if (import.meta.env.DEV) {
+      console.info("[game-rpg] DamageEvent", dmg);
+    }
   }
 }

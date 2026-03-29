@@ -2,7 +2,7 @@ import "./style.css";
 import "./protocol";
 import { Application } from "pixi.js";
 import { applyWorldScale, updateWorldCamera } from "./camera/worldCamera";
-import { CAMERA } from "./constants/gameBalance";
+import { CAMERA, ENGINE } from "./constants/gameBalance";
 import { bindDebugOverlayToggle, createDebugOverlay } from "./debug/debugOverlay";
 import { createGameWorld } from "./ecs/createGameWorld";
 import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
@@ -11,12 +11,19 @@ import { consumeDeferredRenderEvents } from "./ecs/consumeRenderEvents";
 import { processEnemyDeath } from "./ecs/enemyDeath";
 import { processLootPickup } from "./ecs/lootPickup";
 import { spawnLootEntity } from "./ecs/lootSpawn";
+import type { AttackIntent } from "./events/attackIntent";
+import { createGameEventQueues } from "./events/gameEventQueues";
+import { createProcessedEvents } from "./events/processedEvents";
+import { advanceGameTime, createGameTime } from "./ecs/gameTime";
+import { runHealthSystem } from "./ecs/healthSystem";
 import {
-  deltaSecondsClamped,
+  collectPlayerAttackIntents,
+  resolveCombatAndEmitDamage,
+} from "./ecs/playerCombat";
+import {
   movePlayerWithTileCollisions,
   resolvePlayerIntentToVelocity,
 } from "./ecs/playerLocomotion";
-import { resolvePlayerAttack } from "./ecs/playerCombat";
 import { runAnimationSystem } from "./ecs/animationSystem";
 import { updateFacingFromVelocity } from "./ecs/facingSystem";
 import { enqueueLocomotionAnimationRequests } from "./ecs/locomotionAnimationIntent";
@@ -81,6 +88,10 @@ async function main(): Promise<void> {
   spawnEnemyEntity(ecsWorld, enemyRenderId, meta);
 
   const intent = emptyPlayerIntent();
+  const gameTime = createGameTime();
+  const eventQueues = createGameEventQueues();
+  const processedEvents = createProcessedEvents();
+  const attackIntents: AttackIntent[] = [];
   const pendingDestroyRenderIds: number[] = [];
   const animationIntentBuffer = createAnimationIntentBuffer();
   const renderAdapter = createRenderAdapter();
@@ -113,8 +124,6 @@ async function main(): Promise<void> {
   };
 
   app.ticker.add(() => {
-    const dtSec = deltaSecondsClamped(app.ticker.deltaMS);
-
     const renderEventsFromLastFrame = renderEventMailbox.splice(0);
     consumeDeferredRenderEvents(
       ecsWorld,
@@ -123,16 +132,22 @@ async function main(): Promise<void> {
       spawnLootAt
     );
 
+    advanceGameTime(gameTime, app.ticker.deltaMS);
+
     input.fillIntent(intent);
-    resolvePlayerIntentToVelocity(playerEid, intent);
-    movePlayerWithTileCollisions(playerEid, meta, dtSec);
-    resolvePlayerAttack(
+
+    attackIntents.length = 0;
+    collectPlayerAttackIntents(ecsWorld, playerEid, intent, attackIntents);
+    resolveCombatAndEmitDamage(
       ecsWorld,
-      playerEid,
-      intent,
-      performance.now(),
+      gameTime,
+      eventQueues,
+      attackIntents,
       animationIntentBuffer
     );
+
+    runHealthSystem(ecsWorld, eventQueues, processedEvents);
+
     processEnemyDeath(ecsWorld, animationIntentBuffer);
     const picked = processLootPickup(
       ecsWorld,
@@ -145,9 +160,13 @@ async function main(): Promise<void> {
         goldHud.textContent = `Gold: ${goldCount}`;
       }
     }
+
+    resolvePlayerIntentToVelocity(playerEid, intent);
+    movePlayerWithTileCollisions(playerEid, meta, gameTime.dt);
+
     enqueueLocomotionAnimationRequests(ecsWorld, animationIntentBuffer);
     updateFacingFromVelocity(ecsWorld);
-    runAnimationSystem(ecsWorld, animationIntentBuffer, dtSec, devAnimWarn);
+    runAnimationSystem(ecsWorld, animationIntentBuffer, gameTime.dt, devAnimWarn);
     runRenderSystem(
       ecsWorld,
       renderRegistry,
@@ -165,7 +184,13 @@ async function main(): Promise<void> {
       app.screen.height
     );
     hpBarLayer.update(ecsWorld, worldRoot, playerEid);
-    debugOverlay.update(ecsWorld, playerEid);
+    debugOverlay.update(ecsWorld, playerEid, gameTime);
+
+    eventQueues.swap();
+    gameTime.tickId += 1;
+    if (gameTime.tickId % ENGINE.PROCESSED_EVENTS_CLEANUP_EVERY_TICKS === 0) {
+      processedEvents.cleanup(gameTime.tickId, 60);
+    }
   });
 
   subscribeViewportResize(() => {

@@ -1,6 +1,7 @@
 import { query, hasComponent, type World } from "bitecs";
 import { Container, Graphics, Text, type Container as PixiContainer } from "pixi.js";
 import { animStateLabel } from "../animation/animationTypes";
+import type { GameTime } from "../ecs/gameTime";
 import { Animation, Dead, Enemy, Health, Hitbox, Player, Position } from "../ecs/components";
 
 const HITBOX_FILL = { color: 0x44ff88, alpha: 0.14 } as const;
@@ -17,7 +18,7 @@ export type DebugOverlay = {
   readonly root: PixiContainer;
   setVisible(visible: boolean): void;
   toggle(): void;
-  update(world: World, playerEid: number): void;
+  update(world: World, playerEid: number, gameTime: GameTime): void;
   dispose(): void;
 };
 
@@ -88,7 +89,7 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
       root.visible = !root.visible;
     },
 
-    update(world: World, playerEid: number): void {
+    update(world: World, playerEid: number, gameTime: GameTime): void {
       if (!root.visible) {
         return;
       }
@@ -114,7 +115,7 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
 
       const px = Position.x[playerEid];
       const py = Position.y[playerEid];
-      playerPosText.text = `x: ${px.toFixed(0)}  y: ${py.toFixed(0)}`;
+      playerPosText.text = `tick: ${gameTime.tickId}  x: ${px.toFixed(0)}  y: ${py.toFixed(0)}`;
       playerPosText.position.set(px + 16, py);
 
       let hpIndex = 0;
