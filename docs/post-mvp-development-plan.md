@@ -11,14 +11,15 @@
 ## Принципы на этапе роста
 
 1. **ECS без Pixi** — новые состояния (анимация, AI, тип лута в **мире**) выражать компонентами и системами; визуал — через реестр; события от Pixi — только через **`RenderAdapter.poll()` → `RenderEvent[]`** (см. [architecture.md](./architecture.md), контракт RenderAdapter).
-2. **RenderSync ≠ RenderAdapter** — синхронизация «мир → спрайт» отдельно от моста «спрайт / текстура → игра». Иначе через 2–3 фазы обработчики по всей сцене начнут дергать ECS напрямую.
-3. **Один источник координат** — `screenToWorld` для тапов по луту, врагам и UI-хитбоксам в мире, где уместно.
-4. **Протокол наперёд** — новые действия (`ATTACK`, `PICKUP`, `USE_ITEM`, …) сначала как типы и очередь на клиенте, затем отправка на сервер.
-5. **Пайплайн боя и лута событиями** — намерение и результат разделить: валидация атаки / подбора не должна в том же шаге безусловно менять `Health` и инвентарь; промежуточные **`DamageEvent`**, **`LootGranted`** и т.п. упрощают смену на авторитетный сервер (детали в фазе 5).
-6. **Инвентарь не в ECS** — сумка в **`playerState.inventory`**. **Позиция и HP игрока — только ECS**; `playerState` не дублирует мир (таблица в [architecture.md](./architecture.md)). UI читает ECS + `playerState`. Мутации — через **`InventoryService`**: один **транзакционный** **`addItem(...) : boolean`** (проверка + запись внутри, без отдельного «canAdd потом add»), плюс **`removeItem`**, **`hasItem`**. Подбор лута только после **`addItem === true`**, см. фазы 2 и 4.
-7. **Время** — один контекст **`GameTime`** (`dt`, монотонное **`now`**, **`tickId`**); все таймеры и анимации крутятся от **`dt`** в **одних** единицах (секунды), без смеси ms/сек в разных модулях ([architecture.md](./architecture.md)).
-8. **Анимация** — геймплей ставит **`AnimationRequest`**, итоговый `Animation.state` меняет только **FSM / `AnimationSystem`** по приоритетам; не писать состояние клипа из AI, боя или адаптера напрямую ([architecture.md](./architecture.md)).
-9. **Минимальные инкременты** — каждая фаза даёт проверяемый результат без «большого взрыва» рефакторинга.
+2. **Simulation → Presentation → Render** — явные три слоя: **симуляция** (ECS + правила мира), **presentation mapping** (реестр, **`RenderSync`**, будущие VFX/камера/HUD-твины **без** мутации симуляции ради «красоты»), **рендер** (Pixi). ❌ Не сваливать все будущие эффекты в один **`RenderSync`** — иначе он станет узким горлом. См. [architecture.md](./architecture.md), раздел «Три слоя».
+3. **RenderSync ≠ RenderAdapter** — **`RenderSync`** (и прочая presentation) — «мир → картинка»; **`RenderAdapter`** — «спрайт / текстура → игра». **`RenderAdapter`:** допустимо **только чтение** ECS (по необходимости) и **эмит `RenderEvent`**; ❌ **никакой мутации ECS** из адаптера — must-have, см. [architecture.md](./architecture.md), контракт RenderAdapter. Иначе через 2–3 фазы обработчики по всей сцене начнут дергать мир напрямую.
+4. **Один источник координат** — `screenToWorld` для тапов по луту, врагам и UI-хитбоксам в мире, где уместно.
+5. **Протокол наперёд** — новые действия (`ATTACK`, `PICKUP`, `USE_ITEM`, …) сначала как типы и очередь на клиенте, затем отправка на сервер.
+6. **Пайплайн боя и лута событиями** — намерение и результат разделить: валидация атаки / подбора не должна в том же шаге безусловно менять `Health` и инвентарь; промежуточные **`DamageEvent`**, **`LootGranted`** и т.п. упрощают смену на авторитетный сервер (детали в фазе 5). **`emitDamage`** — только из **`DamageEventEmitter`** внутри конвейера (**`TargetResolution` → `DamageCalculation` → emit**); **`CombatSystem`** как оркестратор, не монолит. AI/ввод — **`AttackIntent`**. Плюс **`eventId`** и идемпотентность — см. [architecture.md](./architecture.md).
+7. **Единственный источник правды** — **ECS = мир** (позиции, HP, сущности, лут на карте); **`playerState` = инвентарь** (+ мета, не мир). Любые кэши в UI или системах — **только derived**; ❌ не делать их каноном (иначе десинк и «UI врёт»). Детали — [architecture.md](./architecture.md). Сумка: **`playerState.inventory`**; мутации — **`InventoryService`**, **`tryAddItem(...) → { ok, reason? }`** (атомарно; при **`ok: false`** сумка не меняется), плюс **`removeItem`**, **`hasItem`**. **`LootSystem`** **предлагает** подбор в мире; **правила сумки** — **только** в сервисе. Переход лута в **`picked`** только после **`ok === true`**, см. фазы 2 и 4.
+8. **Время** — один контекст **`GameTime`** (`dt`, монотонное **`now`**, **`tickId`**); все таймеры и анимации крутятся от **`dt`** в **одних** единицах (секунды), без смеси ms/сек в разных модулях ([architecture.md](./architecture.md)).
+9. **Анимация** — **gameplay state** (**`CombatState`**: alive, dead, attacking, stunned, …) и **animation state** (**клипы:** idle, walk, attack, hurt, death) **разделены**; клип — **производный** от gameplay + движения + приоритетов, не единственный источник боя. **`Animation` / FSM** и **presentation** (**`RenderSync`**, …) **не** наносят урон и **не** меняют **`Health`** — только визуал относительно боя. **Fallback:** неизвестный **`state`** или отсутствующий клип → **`defaultState = 'idle'`**. Канон логики не в **`Animation.state`** ([architecture.md](./architecture.md)).
+10. **Минимальные инкременты** — каждая фаза даёт проверяемый результат без «большого взрыва» рефакторинга.
 
 Ниже порядок можно сдвигать внутри **одной** фазы; между фазами есть логические зависимости.
 
@@ -31,7 +32,7 @@
 3. Events → State changes  
 4. Movement + Collision  
 5. AI  
-6. RenderSync  
+6. Presentation (**`RenderSync`** + по мере роста VFX/камера — отдельные модули, см. architecture)  
 7. `RenderAdapter.poll()`  
 
 Это даёт предсказуемость, меньше багов от порядка систем и проще добавлять новые этапы. Детали и примечание про **`poll()`** (конец тика vs начало следующего) — в architecture.
@@ -43,12 +44,23 @@
 | Проблема | Как правильно |
 |----------|----------------|
 | **`RenderEvent`** обрабатываются «когда получится» в том же кадре | Политика **кадр N: `poll()` → буфер; кадр N+1: consume** — см. [architecture.md](./architecture.md), фазы тика. |
-| Урон с **кадра анимации** / `sprite.onFrame` | **`AttackIntent` → `DamageEvent` → `Health`**; анимация только визуал. |
+| VFX, камера, твины HUD разрастают **`RenderSync`** до god-object | Слой **presentation**: отдельные системы/модули рядом с **`RenderSync`** — см. «Три слоя» в [architecture.md](./architecture.md). |
+| Урон с **кадра анимации** / `sprite.onFrame` | **`AttackIntent` → конвейер боя → `DamageEvent` → `Health`**; анимация только визуал. |
+| Применение урона **без проверки `eventId`** / без **`processedEvents`** | Двойной вызов системы или переигрыш очереди **удвоит урон**; контракт обязателен — [architecture.md](./architecture.md). |
+| Два слоя вызывают **`emitDamage`** / создают **`DamageEvent`** | Только **`DamageEventEmitter`** внутри одного конвейера; остальные — **`AttackIntent`** — [architecture.md](./architecture.md). |
+| Один **`CombatSystem`** на всё (валидация + формула + баффы + emit) | Разнести **resolution / calculation / emitter**; оркестратор тонкий — [architecture.md](./architecture.md). |
 | Прямые правки **`playerState.inventory`** из разных систем | Только **`InventoryService`**. |
-| Лут **`picked`**, а предмет не влез в сумку | **`reserved` + `addItem`**: пока нет успешного **`addItem`**, не **`picked`**; при `false` — **`idle`**, см. фаза 2. |
+| **React / UI state** как единственная копия HP, позиции, инвентаря | Канон — **ECS + `playerState`**; в UI — **только derived**, см. [architecture.md](./architecture.md). |
+| Лут **`picked`**, а предмет не влез в сумку | **`reserved` + `tryAddItem`**: пока нет **`ok`**, не **`picked`**; при отказе — **`idle`** + опционально UX по **`reason`**, см. фаза 2. |
+| Правила стака / лимита / квестов продублированы в **`LootSystem`** | Один канон — **`InventoryService.tryAddItem`**; лут не «знает», почему отказ, кроме **`reason`**. |
 | Двойной intent подбора (два тика, двойной тап, лаг) | **`LootState: reserved`**, **`reservedBy`**, таймаут (**~0.2 s**) — см. фаза 2. |
+| Лут **залип в `reserved`** после смерти/исчезновения подбирающего | **Обязательно:** нет **`reservedBy`** в ECS → **`idle`**, **`reservedBy = null`** каждый тик — фаза 2. |
 | **`Math.random()`** для AI think-jitter / «stuck»-сдвига | **`deterministicRng(seed, tickId)`** (или **`entityId`**) — реплей и сервер иначе разъедутся. См. фаза 3. |
+| Все враги делают тяжёлый **`think()`** в одном тике | **`thinkOffset`** (**`tickId % N`**) или **`AIGroupThink`** — см. фаза 3. |
 | Несколько **`AnimationRequest`** в одном тике без слияния | **`AnimationIntentBuffer` + `bestByPriority`** (**100…0**) — см. фаза 1.1 и architecture. |
+| Боевая логика по **`Animation.state`** («в attack — хит активен», «в hurt — стан») | Канон — **`CombatState` / `Health`**; анимация — производная — [architecture.md](./architecture.md). |
+| Урон / **`Health`** из **`AnimationSystem`**, **`onFrame`**, **`ANIMATION_COMPLETE`** | Запрещено — только визуал; бой — конвейер **`DamageEvent`** — [architecture.md](./architecture.md). |
+| Нет fallback при битом **`AnimationRequest`** / нет клипа в таблице | **`defaultState = 'idle'`** — [architecture.md](./architecture.md). |
 
 ---
 
@@ -68,9 +80,12 @@
 - В рантайм игры **копировать только нужные PNG** (и при необходимости собранный атлас) в `public/assets/characters/...` с URL `/assets/...` ([implementation-plan](implementation-plan.md) 2.1); весь `full-assets/` в бандл не включать.
 - Разрезать листы на кадры или грузить как единый спрайт-лист: idle, walk (направления на листе + зеркалирование по X при необходимости), attack, hurt, death — в рамках лицензии пака.
 - **FSM анимации (минимум):** не только `AnimState` + `Facing` + таймер кадра — задать **приоритеты переходов**, иначе attack обрывает walk и «застревает» в idle, hurt ломает attack, death не доигрывается.
-  - **Кто инициирует переход:** бой, AI, движение и ввод ставят **`AnimationRequest { entity, state, force? }`**; **`AnimationSystem`** не обрабатывает сырой список в порядке поступления. За **один тик** на **`eid`**: **`AnimationIntentBuffer[eid] = bestByPriority(...)`** с числами **`death: 100`**, **`hurt: 80`**, **`attack: 60`**, **`walk: 20`**, **`idle: 0`** — иначе **attack + hurt** в одном кадре дают **недетерминизм** от порядка систем. Уже затем сравнение с текущим **`state`**, **`locked`**, **`minHoldTime`**, **`interruptAt`**.
+  - **Gameplay state ≠ animation state:** ввести **`CombatState`** (или аналог): **`alive`**, **`dead`**, **`attacking`**, **`stunned`**, … — канон для боя и станнов. **`Animation.state`** остаётся **`idle` | walk | attack | hurt | death`** — только клипы; **производить** из **`CombatState` + `ActualVelocity` / ввод + события**, одним слоем (**`AnimationSystem`** / **`AnimationDriver`**), чтобы не дублировать «атака» как факт боя и как имя клипа в одной голове.
+  - **Кто инициирует переход по клипам:** по целевой схеме запросы формирует производный слой (или, на раннем MVP, несколько источников **сводятся** в **`AnimationIntentBuffer`** — но логика «можно ли прервать атаку» всё равно из **`CombatState`**, не из «какой кадр спрайта»). **`AnimationSystem`** не обрабатывает сырой список в порядке поступления. За **один тик** на **`eid`**: **`AnimationIntentBuffer[eid] = bestByPriority(...)`** с числами **`death: 100`**, **`hurt: 80`**, **`attack: 60`**, **`walk: 20`**, **`idle: 0`** — иначе **attack + hurt** в одном кадре дают **недетерминизм** от порядка систем. Уже затем сравнение с текущим **`Animation.state`**, **`locked`**, **`minHoldTime`**, **`interruptAt`**.
   - **Анти-spam:** не пушить запрос, если **`state` уже текущий** (без необходимости перезапуска клипа), либо хранить **один последний запрос на сущность за тик** — см. [architecture.md](./architecture.md).
-  - Множество состояний: `'idle' | 'walk' | 'attack' | 'hurt' | 'death'`.
+  - Множество **клипов** (`Animation.state`): `'idle' | 'walk' | 'attack' | 'hurt' | 'death'` — не путать с **`CombatState`**.
+  - **Анимация не трогает gameplay:** FSM и **RenderSync** не вызывают бой и не меняют HP (см. [architecture.md](./architecture.md)); совпадает с запретом урона с кадра спрайта.
+  - **Fallback:** **`ANIMATION.DEFAULT_STATE = 'idle'`**; неизвестный запрос, нет ключа в **`AnimationClips`**, битые данные → **`Animation.state = 'idle'`** + сброс таймера клипа (и dev-log).
   - Компонент или запись в мире вида **`Animation { state, time, duration, loop, locked, minHoldTime, interruptAt }`**: `locked === true` для клипов, которые нельзя перебить (типа **death**). **`duration`** — в **секундах**, в одной системе с **`GameTime.dt`**. **`Animation.time`** накапливается как **`time += gameTime.dt`**. **`interruptAt`** — доля клипа **0..1**: разрешить переход на **более слабое** состояние (например attack → idle/walk), если **`time / duration >= interruptAt`** (и нет более жёсткого запроса). Примеры: **attack** **`interruptAt: 0.5`** — отзывчивее, чем ждать конца клипа; **death** **`interruptAt: 1`** — не прерывается «раньше времени». Фиксированный множитель вроде **0.7** не использовать как единственный порог — только как дефолт, если не задано per-клип.
   - **Анти-дребезг:** **`minHoldTime`** (сек) — пока время **в текущем `state`** меньше **`minHoldTime`**, **не** переключать состояние на более слабое (например walk ↔ idle от дрожащего AI), кроме переходов с более высоким приоритетом (**hurt** / **death**) или **`force`** на запросе. Иначе на мобиле FSM будет дёргаться.
   - **Переходы по времени, не только по событию:** даже при `loop === false` нельзя полагаться только на конец клипа — длинная **attack** «залипает» и портит отзыв. Использовать **`interruptAt`** + при необходимости **`ANIMATION_COMPLETE`** (после consume на **N+1** кадре) для финального такта (**death**).
@@ -109,13 +124,17 @@
   | `LootState` | Поведение |
   |-------------|-----------|
   | **`idle`** | Можно подбирать (hit-test, радиус, логика подбора активна). |
-  | **`reserved`** | Кто-то **начал** подбор: **`reservedBy: entityId | null`**, таймаут (**~0.2 s**). Повторные intent **игнорировать**, пока не **`idle`** / **`picked`**. Защита от **двойного тапа**, двух тиков подряд, лага до **`addItem`**. |
-  | **`picked`** | Уже учтён в инвентаре (**`addItem` успех**, **`LootGranted`** отработал); **повторный подбор запрещён**; сразу переход в **`despawning`**. |
+  | **`reserved`** | Кто-то **начал** подбор: **`reservedBy: entityId | null`**, таймаут (**~0.2 s**). Повторные intent **игнорировать**, пока не **`idle`** / **`picked`**. Если **`reservedBy`** исчез из мира — сразу **`idle`** (обязательное правило ниже). |
+  | **`picked`** | Уже учтён в инвентаре (**`tryAddItem.ok`**, затем при необходимости **`LootGranted`**); **повторный подбор запрещён**; сразу переход в **`despawning`**. |
   | **`despawning`** | Только VFX (fade / scale); коллизии подбора off; по таймеру — удаление entity. |
 
-  **Допустимые переходы (строго):** `idle → reserved → picked → despawning → (entity removed)`; **`reserved → idle`** при **провале `addItem`**, **истечении таймаута** резерва или если **сущность `reservedBy` больше не существует** (умерла, удалена из мира): **`if (LootState === 'reserved' && !entityExists(reservedBy)) → idle, reservedBy = null`** — иначе лут **зависает в `reserved` навсегда**. ❌ Запрещено: **`picked → idle`**, **`despawning → idle`**. Если **`addItem`** вернул `false` из **`reserved`**, вернуться в **`idle`** (предмет остаётся в мире).
+  **Обязательное правило (анти-залипание `reserved`):** если **`LootState === 'reserved'`** и сущность **`reservedBy` не существует** в мире (умерла, **`removeEntity`**, вышла из мира) → **`LootState = 'idle'`**, **`reservedBy = null`**. Проверять **каждый тик** (или в том же проходе, что и **`reserveTimer`**). Без этого лут **навсегда** остаётся в **`reserved`** и не подбирается.
+
+  **Допустимые переходы (строго):** `idle → reserved → picked → despawning → (entity removed)`; **`reserved → idle`** при **`!tryAddItem.ok`**, **истечении таймаута** резерва или по правилу **«`reservedBy` не существует»** выше. ❌ Запрещено: **`picked → idle`**, **`despawning → idle`**. Если **`tryAddItem`** вернул **`ok: false`** из **`reserved`**, вернуться в **`idle`** (предмет остаётся в мире); **`reason`** — для лога / тоста / аналитики, **без** копирования логики сервиса в **`LootSystem`**.
 
   Так проще избежать **двойного подбора** и гонок с инвентарём (в т.ч. до будущего мультиплеера).
+
+- **Граница: лут предлагает, инвентарь решает.** **`LootSystem`** проверяет только **мир**: радиус, hit-test, **`reserved`**, таймаут, существование **`reservedBy`**. ❌ Не вводить второй слой «влезет / не влезет» со своими формулами стака и слотов — иначе **рассинхрон с сервером** и **дублирование правил**. Единственное решение — **`InventoryService.tryAddItem`** → **`ok` + `reason`**.
 
 - **Визуальный feedback при подборе — без участия `RenderAdapter` в жизни сущности.** Адаптер **не решает**, когда лут исчезает из мира.
 
@@ -129,13 +148,14 @@
       LootState = 'reserved', reservedBy = pickerEid, reserveTimer = 0.2
     если LootState === 'reserved' и reserveTimer <= 0:
       LootState = 'idle', reservedBy = null
-    если LootState === 'reserved' и вызываем addItem:
-      if InventoryService.addItem(item):  // атомарно внутри
-        → LootGranted в очередь (фаза 5)
+    если LootState === 'reserved' и условия мира ОК для попытки подбора:
+      r = InventoryService.tryAddItem(item)  // единственное место бизнес-логики сумки
+      if r.ok:
+        → emit LootGranted в queues.current (контракт очередей; consume в фазе тика «Events → State»)
         LootState = 'picked' → сразу 'despawning'
         pickupVfxTimer = LOOT.PICKUP_FEEDBACK_SEC  // константа 0.2–0.3; UX — не резать при оптимизации
       else:
-        LootState = 'idle', reservedBy = null
+        LootState = 'idle', reservedBy = null  // опционально: UI / dev по r.reason
 
   RenderSync:
     при 'despawning' + timer → только визуал (fade / scale)
@@ -144,7 +164,7 @@
     timer -= gameTime.dt; timer <= 0 → removeEntity(лут)
   ```
 
-  Пока нет успешного **`addItem`**, не ставить **`picked`/`despawning`**. Пока **`reserved`**, второй подбор не начинать.
+  Пока нет **`tryAddItem.ok`**, не ставить **`picked`/`despawning`** и **не** эмитить **`LootGranted`**. Пока **`reserved`**, второй подбор не начинать.
 
   **RenderSync** лишь отображает fade; **удаление сущности** — только по **игровому таймеру**, не по событию из Pixi. **Задержка обратной связи** (**`pickupVfxTimer` 0.2–0.3 s**) — часть UX, не выкидывать при «оптимизации».
 
@@ -167,11 +187,13 @@
   }
   ```
 
-  **Правило:** AI-система **не** пушит **`DamageEvent`**. Только **`AIIntent`**; дальше общий путь **`AttackIntent` → валидация → `DamageEvent`**, как у игрока ([architecture.md](./architecture.md)). Иначе при `type: 'attack'` легко получить двойную генерацию урона (AI + AttackSystem).
+  **Правило:** AI-система **не** пушит **`DamageEvent`**. Только **`AIIntent`**; дальше **`AttackIntent` → конвейер боя → `DamageEvent`**, как у игрока ([architecture.md](./architecture.md)). Иначе при `type: 'attack'` легко получить двойную генерацию урона (два продьюсера).
 
-  Дальше: при `chase` AI участвует в **одном** агрегирующем проходе **`DesiredVelocity`** (см. [architecture.md](./architecture.md): не несколько систем независимо пишут в одно поле). **Knockback / толчки** — в **`ExternalForces` / импульсы**, не перезаписью **`DesiredVelocity`**. **Коллизии** формируют **`ActualVelocity`**; **`Position`** интегрирует **только** **`MovementSystem`**. При **`attack`** в радиусе **AttackSystem** создаёт **`DamageEvent`**.
+  Дальше: при `chase` AI участвует в **одном** агрегирующем проходе **`DesiredVelocity`** (см. [architecture.md](./architecture.md): не несколько систем независимо пишут в одно поле). **Knockback / толчки** — в **`ExternalForces` / импульсы**, не перезаписью **`DesiredVelocity`**. **Коллизии** формируют **`ActualVelocity`**; **`Position`** интегрирует **только** **`MovementSystem`**. При **`attack`** в радиусе намерение уходит в общий контур; урон в очередь — только **`DamageEventEmitter`** после resolution/расчёта.
 
 - **Частота «мыслей» vs симуляция:** не вызывать тяжёлый **`think()`** каждый тик для всех врагов — на мобиле при **~20** NPC будет деградация. На сущности: **`AIComponent { nextThinkTime: number; thinkSeed?: number }`**; если **`gameTime.now >= nextThinkTime`**, выполнить **`think()`**, затем **`nextThinkTime = now + jitterSec`**, где **`jitterSec`** в **0.1…0.3** с, но **не** через голый **`Math.random()`** (реплей, сервер, десинк) — а **`deterministicRng(thinkSeed, tickId)`** (или **`rng(entityId, tickId)`** в том же диапазоне). Движение и анимация — каждый кадр; решения — реже.
+
+- **Фазирование по тику (масштаб, обязательно при росте числа врагов):** даже с **`nextThinkTime`** таймеры могут **сойтись**, и на одном кадре **десятки** NPC одновременно посчитают агро, дистанции и атаку → **CPU spike** и «стадо». ✅ Дешёвый приём: **`thinkOffset = stableId % N`** (например **`entityId % N`** или отдельный **`spawnIndex`**, если **`eid`** переиспользуется); тяжёлый **`think()`** только если **`gameTime.tickId % N === thinkOffset`** (и по-прежнему **`now >= nextThinkTime`**, если оба правила используются вместе). Тогда в среднем за тик «думает» **~1/N** врагов. Альтернатива богаче по дизайну: **`AIGroupThink`** — враги в **группах**, каждый тик обновляется **одна группа** (**`groupId === tickId % numGroups`**), внутри группы — тот же **`think()`** / лимиты.
 
 - Состояния мозгов: idle → преследование при входе в `aggroRadius` → попытка атаки в `attackRange` с кулдауном.
 - Движение к игроку с **теми же правилами коллизий**, что у игрока (без прохода сквозь стены).
@@ -214,7 +236,7 @@
 
   UI оверлея, использование предмета и сейв читают **`playerState`**; ECS знает только мир (игрок, враги, лут на карте). Так инвентарь не раздувает мир сущностями-слотами.
 
-- **`InventoryService`:** один атомарный **`addItem(...) : boolean`** (вся проверка внутри); плюс **`removeItem`**, **`hasItem`**. Подбор, использование, дроп — только через сервис. Не дублировать «сначала проверка, потом добавление» в вызывающем коде — иначе гонки при сервере.
+- **`InventoryService`:** один атомарный **`tryAddItem(...) → { ok: boolean; reason?: AddItemRejectReason }`** — вся логика стака, лимитов и будущих ограничений **внутри**; при **`ok: false`** состояние сумки неизменно. Плюс **`removeItem`**, **`hasItem`**. Подбор, использование, дроп — только через сервис. **`LootSystem`** вызывает **`tryAddItem`** и по **`ok` / `reason`** ведёт только **`LootState`** и UX, **без** дублирования правил. Имя **`addItem`** как обёртка над **`tryAddItem`** допустимо, если контракт тот же (**результат + причина**).
 
 **Граница синхронизации:** позиция и HP игрока — **только ECS**; в **`playerState` нет** дублей мира. Полная таблица — [architecture.md](./architecture.md) («Граница playerState и ECS»).
 
@@ -248,16 +270,17 @@
 Пример цепочки (имена условные):
 
 ```text
-AttackIntent / валидация (дистанция, кулдаун)
-  → AttackSystem emitDamage(...): внутрь queues.current.damage — DamageEvent { tickId, eventId, sourceType: 'entity', sourceId, targetId, amount, sourceX, sourceY }
-  → (конец кадра swap) в N+1 HealthSystem читает queues.processing.damage: если eventId ∉ processedEvents → применить урон → добавить eventId; после фазы 3 — processing.clear()
+AttackIntent → TargetResolutionSystem → DamageCalculationSystem → DamageEventEmitter.emitDamage(...)
+  → queues.current.damage: DamageEvent { tickId, eventId, sourceType, sourceId, targetId, amount, sourceX, sourceY }
+  → (конец кадра swap) в N+1 HealthSystem читает getDamageEvents(): для каждого события — если eventId уже в processedEvents → пропуск; иначе применить урон и записать eventId (контракт обязателен при любом повторном проходе / сбое)
 
-PICKUP намерение / валидация
-  → LootPickupSystem эмитит LootGranted в queues.current (тот же контракт swap / processing)
-  → InventoryService.addItem(...)
+PICKUP намерение / валидация мира (радиус, reserved, …)
+  → InventoryService.tryAddItem(...)  // решает сумка; ok + reason
+  → если ok: emit LootGranted в queues.current (тот же контракт swap / processing) + смена LootState
+  → если !ok: лут остаётся в мире; reason — для ответа сервера / UI (тот же enum, что на клиенте)
 ```
 
-**`DamageEvent`:** **`tickId`** + **`eventId`** + **`sourceType`**; **`HealthSystem`** — скользящее окно по **`tickId`**. Очереди — **double-buffer** в [architecture.md](./architecture.md).
+**`DamageEvent`:** **`eventId`** — обязательный **uniqueId**; применение урона **идемпотентно** (**обработан → игнор**). Плюс **`tickId`**, **`sourceType`**; **`processedEvents`** со скользящим окном. Очереди — **double-buffer** в [architecture.md](./architecture.md).
 
 Протокол наружу по-прежнему **`ATTACK`**, **`PICKUP`** (или эквивалент); внутри клиента **не** смешивать «решили атаковать» и «сразу вычли HP» в одном неделимом куске без события между ними.
 
@@ -267,9 +290,9 @@ PICKUP намерение / валидация
 
 ## Микро-улучшения (не блокеры)
 
-- **Debug overlay — до AI:** включить **до** фазы с AI и сложным лутом: **хитбоксы**, **`aggroRadius` / `attackRange`**, **`pickupRadius`**, **`DesiredVelocity` / `ActualVelocity` / внешние силы**, **`Animation.state`**, **`Facing` / `facingLocked`**, **`LootState`**, плюс сразу флаги **`showAIState`** (intent / phase), **`showFSMState`** (буфер запросов, приоритет победителя), **`showEventCounts`** (размеры **`current` / `processing`** после фаз). **Переключатель в рантайме:** не только dev-сборка — например клавиша **`D`** / жест **toggle**, чтобы не упираться только в логи.
+- **Debug overlay — до AI:** включить **до** фазы с AI и сложным лутом: **хитбоксы**, **`aggroRadius` / `attackRange`**, **`pickupRadius`**, **`DesiredVelocity` / `ActualVelocity` / внешние силы**, **`CombatState`** (если заведён), **`Animation.state`**, **`Facing` / `facingLocked`**, **`LootState`**, плюс сразу флаги **`showAIState`** (intent / phase), **`showFSMState`** (буфер запросов, приоритет победителя), **`showEventCounts`** (размеры **`current` / `processing`** после фаз). **Переключатель в рантайме:** не только dev-сборка — например клавиша **`D`** / жест **toggle**, чтобы не упираться только в логи.
 - **Камера:** вводить **`cameraLerp`** и **`cameraDeadzone`** (`{ x: 40, y: 30 }` в px) **вместе** — иначе lerp без deadzone даёт дрожание и дискомфорт на мобиле. См. [architecture.md](./architecture.md).
-- **Константы баланса в одном месте:** например `gameBalance.ts` / `constants.ts` — **`interruptAt`** per-клип в данных анимации (или дефолт **0.7** только как fallback), `ANIMATION.MIN_HOLD_WALK`, `LOOT.PICKUP_RADIUS`, `LOOT.RESERVE_TIMEOUT`, **`LOOT.PICKUP_FEEDBACK_SEC`** (0.2–0.3), `LOOT.DESPAWN_TIME`, `AI.AGGRO_RADIUS`, `AI.THINK_INTERVAL_MIN` / `MAX`, … Ускоряет подбор цифр без поиска по коду.
+- **Константы баланса в одном месте:** например `gameBalance.ts` / `constants.ts` — **`ANIMATION.DEFAULT_STATE`** (**`'idle'`**), **`interruptAt`** per-клип в данных анимации (или дефолт **0.7** только как fallback), `ANIMATION.MIN_HOLD_WALK`, `LOOT.PICKUP_RADIUS`, `LOOT.RESERVE_TIMEOUT`, **`LOOT.PICKUP_FEEDBACK_SEC`** (0.2–0.3), `LOOT.DESPAWN_TIME`, `AI.AGGRO_RADIUS`, `AI.THINK_INTERVAL_MIN` / `MAX`, **`AI.THINK_PHASE_N`** (делитель тика для **`thinkOffset`**) или **`AI.NUM_THINK_GROUPS`**, … Ускоряет подбор цифр без поиска по коду.
 - **На будущее (реплеи / сервер):** детерминированный RNG уже нужен для **think-interval** и опционально **stuck**-сдвига (фаза 3); тот же **`rng(seed, tickId)`** можно расширить на прочие игровые броски.
 
 ## Фаза 6 — Звук
@@ -297,7 +320,7 @@ PICKUP намерение / валидация
 
 | Тема | Где зафиксировано |
 |------|-------------------|
-| **GameTime**, **GameEventQueues** (фасад **`emit*` / `get*`**, **swap**, **`processing.clear()`**), **`processedEvents`**, **`DamageEvent.sourceType`**, **`DesiredVelocity`** (один агрегатор) + **`ExternalForces`**, **`ActualVelocity`**, **только MovementSystem → `Position`**, **AI** + **`deterministicRng(seed, tickId)`** для think-jitter, **без прямого `DamageEvent`**, **`AnimationIntentBuffer` / приоритеты 100…0**, **`nextThinkTime`**, **RenderSync**, **`RenderEvent.lane`**, **`minHoldTime` / `interruptAt` / разблокировка `facingLocked`**, **`addItem`**, **`LootState` + `reserved` + смерть `reservedBy`**, **HP bars screen-space + snap**, **overlay: AI / FSM / event counts**, граница **ECS ↔ playerState** | [architecture.md](./architecture.md) |
+| **GameTime**, **GameEventQueues**, **конвейер боя** (**`TargetResolution` / `DamageCalculation` / `DamageEventEmitter`**), **`AttackIntent`**, **`DamageEvent` + идемпотентность**, **`CombatState` vs `Animation.state`**, **`DesiredVelocity`**, **`ExternalForces`**, **MovementSystem**, **AI** (**`nextThinkTime`**, **`thinkOffset`**, группы), **`AnimationIntentBuffer`**, **Simulation / Presentation / Render**, **`RenderSync`**, **`RenderEvent.lane`**, **`tryAddItem` / `LootGranted`**, **`LootState`**, граница **ECS ↔ `playerState`** | [architecture.md](./architecture.md) |
 | Пути `/assets/`, MVP-цикл | [implementation-plan.md](./implementation-plan.md) |
 | Порядок агент-ранов MVP | [agent-checklists/README.md](./agent-checklists/README.md) |
 | Список «после MVP» в плане имплементации | implementation-plan, раздел «После MVP» — этот документ его детализирует и приоритизирует |
