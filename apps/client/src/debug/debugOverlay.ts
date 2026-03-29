@@ -1,11 +1,24 @@
 import { query, hasComponent, type World } from "bitecs";
 import { Container, Graphics, Text, type Container as PixiContainer } from "pixi.js";
 import { animStateLabel } from "../animation/animationTypes";
+import { LOOT } from "../constants/gameBalance";
 import type { GameTime } from "../ecs/gameTime";
-import { Animation, Dead, Enemy, Health, Hitbox, Player, Position } from "../ecs/components";
+import {
+  Animation,
+  Dead,
+  Enemy,
+  Health,
+  Hitbox,
+  Loot,
+  LootState,
+  lootStateLabel,
+  Player,
+  Position,
+} from "../ecs/components";
 
 const HITBOX_FILL = { color: 0x44ff88, alpha: 0.14 } as const;
 const HITBOX_STROKE = { width: 1, color: 0x66ffaa, alpha: 0.85 } as const;
+const PICKUP_RADIUS_STROKE = { width: 1, color: 0xffcc00, alpha: 0.75 } as const;
 
 const labelStyle = {
   fontFamily: "system-ui, sans-serif",
@@ -53,6 +66,19 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
 
   const enemyHpPool: Text[] = [];
   const animLabelPool: Text[] = [];
+  const lootLabelPool: Text[] = [];
+
+  function ensureLootLabel(index: number): Text {
+    let t = lootLabelPool[index];
+    if (!t) {
+      t = new Text({ text: "", style: labelStyle });
+      t.eventMode = "none";
+      t.anchor.set(0.5, 0);
+      lootLabelPool.push(t);
+      root.addChild(t);
+    }
+    return t;
+  }
 
   function ensureAnimLabel(index: number): Text {
     let t = animLabelPool[index];
@@ -118,6 +144,8 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
       playerPosText.text = `tick: ${gameTime.tickId}  x: ${px.toFixed(0)}  y: ${py.toFixed(0)}`;
       playerPosText.position.set(px + 16, py);
 
+      hitGfx.circle(px, py, LOOT.PICKUP_RADIUS).stroke(PICKUP_RADIUS_STROKE);
+
       let hpIndex = 0;
       const enemies = query(world, [Enemy, Health, Position, Hitbox]);
       for (let i = 0; i < enemies.length; i++) {
@@ -157,6 +185,22 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
       }
       for (let j = animIndex; j < animLabelPool.length; j++) {
         animLabelPool[j]!.visible = false;
+      }
+
+      let lootIndex = 0;
+      const lootEnts = query(world, [Loot, LootState, Position, Hitbox]);
+      for (let i = 0; i < lootEnts.length; i++) {
+        const eid = lootEnts[i]!;
+        const label = ensureLootLabel(lootIndex++);
+        label.text = `loot: ${lootStateLabel(LootState.state[eid])}`;
+        const cx = Position.x[eid];
+        const cy = Position.y[eid];
+        const hh = Hitbox.height[eid] / 2;
+        label.position.set(cx, cy + hh + 10);
+        label.visible = true;
+      }
+      for (let j = lootIndex; j < lootLabelPool.length; j++) {
+        lootLabelPool[j]!.visible = false;
       }
     },
 

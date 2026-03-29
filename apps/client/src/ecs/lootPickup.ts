@@ -1,50 +1,140 @@
-import { hasComponent, query, removeEntity, type World } from "bitecs";
-import { aabbFromCenter, aabbIntersects } from "../collision/tileCollision";
-import { Hitbox, Loot, Player, Position, RenderRef } from "./components";
+import {
+  addComponent,
+  entityExists,
+  hasComponent,
+  query,
+  removeEntity,
+  type World,
+} from "bitecs";
+import { LOOT } from "../constants/gameBalance";
+import type { GameEventQueues } from "../events/gameEventQueues";
+import type { GameTime } from "./gameTime";
+import {
+  DespawnTimer,
+  Hitbox,
+  Loot,
+  LootItemKind,
+  LootItemKindEnum,
+  LootReserve,
+  LootState,
+  LootStateEnum,
+  Player,
+  Position,
+  RenderRef,
+} from "./components";
+
+function distanceCenters(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number
+): number {
+  return Math.hypot(ax - bx, ay - by);
+}
+
+function lootItemKindString(kind: number): string | undefined {
+  if (kind === LootItemKindEnum.Gold) {
+    return "gold";
+  }
+  return undefined;
+}
 
 /**
- * Автоподбор при пересечении AABB игрока и лута.
- * После MVP: см. implementation-plan §6 — радиус / тап, чтобы не подбирать «мимо» на мобиле.
+ * FSM лута: idle → reserved → despawning → remove (run-17).
+ * Радиус подбора, reserved/таймаут, LootGranted в current (применение золота — фаза 3).
  */
-/** @returns сколько единиц лута подобрано за кадр */
-export function processLootPickup(
+export function runLootSystem(
   world: World,
   playerEid: number,
+  gameTime: GameTime,
+  queues: GameEventQueues,
   outDestroyRenderIds: number[]
-): number {
+): void {
   if (!hasComponent(world, playerEid, Player)) {
-    return 0;
+    return;
   }
-  const phw = Hitbox.width[playerEid] / 2;
-  const phh = Hitbox.height[playerEid] / 2;
-  const playerBox = aabbFromCenter(
-    Position.x[playerEid],
-    Position.y[playerEid],
-    phw,
-    phh
-  );
+  const px = Position.x[playerEid];
+  const py = Position.y[playerEid];
+  const dt = gameTime.dt;
 
-  const lootEntities = query(world, [Loot, Position, Hitbox, RenderRef]);
-  const toRemove: number[] = [];
-  for (let i = 0; i < lootEntities.length; i++) {
-    const leid = lootEntities[i];
-    const lhw = Hitbox.width[leid] / 2;
-    const lhh = Hitbox.height[leid] / 2;
-    const lootBox = aabbFromCenter(
-      Position.x[leid],
-      Position.y[leid],
-      lhw,
-      lhh
-    );
-    if (aabbIntersects(playerBox, lootBox)) {
-      toRemove.push(leid);
+  const despawnQs = query(world, [
+    Loot,
+    LootState,
+    DespawnTimer,
+    Position,
+    RenderRef,
+  ]);
+  for (let i = 0; i < despawnQs.length; i++) {
+    const leid = despawnQs[i]!;
+    if (LootState.state[leid] !== LootStateEnum.Despawning) {
+      continue;
+    }
+    DespawnTimer.timer[leid] -= dt;
+    if (DespawnTimer.timer[leid] <= 0) {
+      outDestroyRenderIds.push(RenderRef.renderId[leid]);
+      removeEntity(world, leid);
     }
   }
 
-  for (let i = 0; i < toRemove.length; i++) {
-    const leid = toRemove[i];
-    outDestroyRenderIds.push(RenderRef.renderId[leid]);
-    removeEntity(world, leid);
+  const activeLoot = query(world, [
+    Loot,
+    LootState,
+    LootReserve,
+    LootItemKind,
+    Position,
+    Hitbox,
+    RenderRef,
+  ]);
+
+  for (let i = 0; i < activeLoot.length; i++) {
+    const leid = activeLoot[i]!;
+    const st = LootState.state[leid];
+    if (st === LootStateEnum.Despawning) {
+      continue;
+    }
+
+    const lx = Position.x[leid];
+    const ly = Position.y[leid];
+    const dist = distanceCenters(px, py, lx, ly);
+    const inRadius = dist < LOOT.PICKUP_RADIUS;
+
+    if (st === LootStateEnum.Reserved) {
+      const by = LootReserve.reservedBy[leid];
+      if (by === 0 || !entityExists(world, by)) {
+        LootState.state[leid] = LootStateEnum.Idle;
+        LootReserve.reservedBy[leid] = 0;
+        LootReserve.reserveTimer[leid] = 0;
+        continue;
+      }
+      if (LootReserve.reserveTimer[leid] <= 0) {
+        LootState.state[leid] = LootStateEnum.Idle;
+        LootReserve.reservedBy[leid] = 0;
+        LootReserve.reserveTimer[leid] = 0;
+        continue;
+      }
+      if (inRadius) {
+        const kind = LootItemKind.kind[leid] ?? LootItemKindEnum.Gold;
+        queues.emitLootGranted({
+          tickId: gameTime.tickId,
+          entityId: leid,
+          itemKind: lootItemKindString(kind),
+          pickerEid: by,
+        });
+        LootState.state[leid] = LootStateEnum.Despawning;
+        LootReserve.reservedBy[leid] = 0;
+        LootReserve.reserveTimer[leid] = 0;
+        addComponent(world, leid, DespawnTimer);
+        DespawnTimer.timer[leid] = LOOT.DESPAWN_TIME;
+        continue;
+      }
+      LootReserve.reserveTimer[leid] -= dt;
+      continue;
+    }
+
+    if (st === LootStateEnum.Idle && inRadius) {
+      LootState.state[leid] = LootStateEnum.Reserved;
+      LootReserve.reservedBy[leid] = playerEid;
+      LootReserve.reserveTimer[leid] = LOOT.RESERVE_TIMEOUT;
+    }
   }
-  return toRemove.length;
 }

@@ -46,7 +46,9 @@ export function bindGameInput(
   worldRoot: Container,
   getPlayerWorldPos: () => { x: number; y: number },
   /** Мировые px → eid врага или -1 (run-08: hit-test перед движением по тапу). */
-  pickEnemyAtWorld: (worldX: number, worldY: number) => number
+  pickEnemyAtWorld: (worldX: number, worldY: number) => number,
+  /** RenderAdapter: POINTER_TAP в мир (run-17: тап по луту), без мутации ECS здесь. */
+  onPointerTapWorld?: (worldX: number, worldY: number) => void
 ): InputBindingHandles {
   const keysDown = new Set<string>();
   let pointerMode = detectPointerMode();
@@ -109,6 +111,7 @@ export function bindGameInput(
 
   const onPointerTap = (e: FederatedPointerEvent): void => {
     const w = screenToWorld(e.globalX, e.globalY, worldRoot);
+    onPointerTapWorld?.(w.x, w.y);
     const enemyEid = pickEnemyAtWorld(w.x, w.y);
     if (enemyEid >= 0) {
       pendingAttackTarget = enemyEid;

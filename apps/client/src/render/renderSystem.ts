@@ -1,12 +1,17 @@
 import { hasComponent, query, type World } from "bitecs";
 import { Sprite, type Texture } from "pixi.js";
 import { AnimState, FacingDir } from "../animation/animationTypes";
+import { LOOT } from "../constants/gameBalance";
 import { getCharacterVisualKind } from "../ecs/characterVisualKind";
 import {
   Animation,
   Dead,
+  DespawnTimer,
   Enemy,
   Facing,
+  Loot,
+  LootState,
+  LootStateEnum,
   Position,
   RenderRef,
 } from "../ecs/components";
@@ -74,7 +79,7 @@ function maybePushAnimationComplete(
 }
 
 /**
- * Синхронизация ECS → реестр Pixi: destroy, мёртвые враги, позиции, кадр анимации, зеркало по Facing.
+ * Синхронизация ECS → реестр Pixi: destroy, мёртвые враги, позиции, кадр анимации, лут + fade.
  */
 export function runRenderSystem(
   world: World,
@@ -117,6 +122,23 @@ export function runRenderSystem(
     }
     node.visible = true;
     node.position.set(Position.x[eid], Position.y[eid]);
+
+    if (hasComponent(world, eid, Loot)) {
+      if (
+        LootState.state[eid] === LootStateEnum.Despawning &&
+        hasComponent(world, eid, DespawnTimer)
+      ) {
+        const t = DespawnTimer.timer[eid];
+        const a = Math.max(0, Math.min(1, t / LOOT.DESPAWN_TIME));
+        node.alpha = a;
+        const sc = 0.88 + 0.12 * a;
+        node.scale.set(sc);
+      } else {
+        node.alpha = 1;
+        node.scale.set(1);
+      }
+      continue;
+    }
 
     if (!hasComponent(world, eid, Animation) || !(node instanceof Sprite)) {
       continue;

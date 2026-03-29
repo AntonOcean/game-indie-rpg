@@ -9,7 +9,7 @@ import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
 import { spawnEnemyEntity } from "./ecs/enemySpawn";
 import { consumeDeferredRenderEvents } from "./ecs/consumeRenderEvents";
 import { processEnemyDeath } from "./ecs/enemyDeath";
-import { processLootPickup } from "./ecs/lootPickup";
+import { runLootSystem } from "./ecs/lootPickup";
 import { spawnLootEntity } from "./ecs/lootSpawn";
 import type { AttackIntent } from "./events/attackIntent";
 import { createGameEventQueues } from "./events/gameEventQueues";
@@ -34,6 +34,7 @@ import { bindGameInput } from "./input/inputBindings";
 import { emptyPlayerIntent } from "./input/playerIntent";
 import { createAnimationIntentBuffer } from "./animation/animationIntentBuffer";
 import { createLootVisualAt } from "./render/mountLootVisual";
+import { loadItemAtlas } from "./render/itemAtlas";
 import { loadCharacterAnimationFrames } from "./render/loadCharacterAnimationTextures";
 import { mountEnemyVisual } from "./render/mountEnemyVisual";
 import { mountPlayerVisual } from "./render/mountPlayerVisual";
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
 
   const { meta, worldRoot } = await loadGameMap(app);
   applyWorldScale(worldRoot, CAMERA.WORLD_SCALE);
+  await loadItemAtlas();
   const characterAnimFrames = await loadCharacterAnimationFrames();
   const ecsWorld = createGameWorld();
   const renderRegistry = createRenderRegistry();
@@ -111,7 +113,10 @@ async function main(): Promise<void> {
       x: Position.x[playerEid],
       y: Position.y[playerEid],
     }),
-    (wx, wy) => pickEnemyAtWorld(ecsWorld, wx, wy)
+    (wx, wy) => pickEnemyAtWorld(ecsWorld, wx, wy),
+    (wx, wy) => {
+      renderAdapter.push({ type: "POINTER_TAP", worldX: wx, worldY: wy });
+    }
   );
 
   const debugOverlay = createDebugOverlay(worldRoot);
@@ -119,7 +124,13 @@ async function main(): Promise<void> {
   const hpBarLayer = createHpBarLayer(app.stage);
 
   const spawnLootAt = (wx: number, wy: number): void => {
-    const lootRenderId = createLootVisualAt(worldRoot, renderRegistry, wx, wy);
+    const lootRenderId = createLootVisualAt(
+      worldRoot,
+      renderRegistry,
+      wx,
+      wy,
+      "gold"
+    );
     spawnLootEntity(ecsWorld, lootRenderId, wx, wy);
   };
 
@@ -129,7 +140,8 @@ async function main(): Promise<void> {
       ecsWorld,
       renderEventsFromLastFrame,
       animationIntentBuffer,
-      spawnLootAt
+      spawnLootAt,
+      playerEid
     );
 
     advanceGameTime(gameTime, app.ticker.deltaMS);
@@ -146,20 +158,23 @@ async function main(): Promise<void> {
       animationIntentBuffer
     );
 
-    runHealthSystem(ecsWorld, eventQueues, processedEvents);
+    runHealthSystem(ecsWorld, eventQueues, processedEvents, {
+      onLootGranted: (n: number) => {
+        goldCount += n;
+        if (goldHud) {
+          goldHud.textContent = `Gold: ${goldCount}`;
+        }
+      },
+    });
 
     processEnemyDeath(ecsWorld, animationIntentBuffer);
-    const picked = processLootPickup(
+    runLootSystem(
       ecsWorld,
       playerEid,
+      gameTime,
+      eventQueues,
       pendingDestroyRenderIds
     );
-    if (picked > 0) {
-      goldCount += picked;
-      if (goldHud) {
-        goldHud.textContent = `Gold: ${goldCount}`;
-      }
-    }
 
     resolvePlayerIntentToVelocity(playerEid, intent);
     movePlayerWithTileCollisions(playerEid, meta, gameTime.dt);

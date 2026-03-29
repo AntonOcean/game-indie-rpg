@@ -34,6 +34,13 @@ export const LOOT = {
   HITBOX_SIZE: 24,
   VISUAL_SIZE: 20,
   VISUAL_COLOR: 0xe6c200,
+  /** Центр–центр (px); меньше зоны пересечения AABB с хитбоксом 24 — нет «мимо» на мобиле. */
+  PICKUP_RADIUS: 20,
+  RESERVE_TIMEOUT: 0.2,
+  /** UX: не обрезать при оптимизации (post-mvp фаза 2). */
+  PICKUP_FEEDBACK_SEC: 0.25,
+  /** Полный цикл despawning (fade + удаление entity). */
+  DESPAWN_TIME: 0.3,
 } as const;
 
 export const CAMERA = {

@@ -1,13 +1,9 @@
-import { Graphics } from "pixi.js";
-import { LOOT } from "../constants/gameBalance";
+import { Sprite } from "pixi.js";
+import type { ItemIconId } from "./itemAtlas";
+import { getItemIcon } from "./itemAtlas";
 
-/** Жёлтый квадрат «монета»; центр = Position. */
-export function createLootGraphics(): Graphics {
-  const s = LOOT.VISUAL_SIZE;
-  const half = s / 2;
-  const g = new Graphics();
-  g.rect(-half, -half, s, s).fill({
-    color: LOOT.VISUAL_COLOR,
-  });
-  return g;
+export function createLootSprite(itemId: ItemIconId): Sprite {
+  const sprite = new Sprite(getItemIcon(itemId));
+  sprite.anchor.set(0.5);
+  return sprite;
 }

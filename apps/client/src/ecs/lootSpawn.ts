@@ -1,6 +1,16 @@
 import { addComponent, addEntity, type World } from "bitecs";
 import { LOOT } from "../constants/gameBalance";
-import { Hitbox, Loot, Position, RenderRef } from "./components";
+import {
+  Hitbox,
+  Loot,
+  LootItemKind,
+  LootItemKindEnum,
+  LootReserve,
+  LootState,
+  LootStateEnum,
+  Position,
+  RenderRef,
+} from "./components";
 
 export function spawnLootEntity(
   world: World,
@@ -10,6 +20,14 @@ export function spawnLootEntity(
 ): number {
   const eid = addEntity(world);
   addComponent(world, eid, Loot);
+  addComponent(world, eid, LootState);
+  LootState.state[eid] = LootStateEnum.Idle;
+  addComponent(world, eid, LootReserve);
+  LootReserve.reservedBy[eid] = 0;
+  LootReserve.reserveTimer[eid] = 0;
+  addComponent(world, eid, LootItemKind);
+  LootItemKind.kind[eid] = LootItemKindEnum.Gold;
+
   addComponent(world, eid, Position);
   Position.x[eid] = worldX;
   Position.y[eid] = worldY;

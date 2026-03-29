@@ -63,45 +63,45 @@ export function getItemIcon(id: ItemIconId): Texture {
 ## Задачи (чек-лист)
 
 ### LootState
-- [ ] **Компонент `LootState`** в ECS (числовой enum):
+- [x] **Компонент `LootState`** в ECS (числовой enum):
   - `idle = 0`, `reserved = 1`, `picked = 2`, `despawning = 3`.
-- [ ] **Компонент `LootReserve`**:
+- [x] **Компонент `LootReserve`**:
   - `reservedBy` (eid подбирающего; 0 = нет).
   - `reserveTimer` (секунды, обратный отсчёт).
-- [ ] **Компонент `DespawnTimer`**:
+- [x] **Компонент `DespawnTimer`**:
   - `timer` (секунды, обратный отсчёт для fade/удаления).
-- [ ] **Константы** в `gameBalance.ts`:
+- [x] **Константы** в `gameBalance.ts`:
   - `LOOT.PICKUP_RADIUS` (px, меньше текущего AABB overlap).
   - `LOOT.RESERVE_TIMEOUT` (~0.2 с).
   - `LOOT.PICKUP_FEEDBACK_SEC` (0.2–0.3 с, время VFX fade).
   - `LOOT.DESPAWN_TIME` (0.3 с — полный цикл despawning).
 
 ### LootSystem (переписать `lootPickup.ts`)
-- [ ] **Каждый тик** для сущностей `Loot`:
+- [x] **Каждый тик** для сущностей `Loot`:
   1. Если `LootState === reserved` и `!entityExists(reservedBy)` → `idle`, `reservedBy = 0`.
   2. Если `LootState === reserved` и `reserveTimer <= 0` → `idle`, `reservedBy = 0`.
   3. `reserveTimer -= dt` при `reserved`.
-- [ ] **Intent подбора** (тап по луту или вход в радиус):
+- [x] **Intent подбора** (тап по луту или вход в радиус):
   - Проверка: `LootState === idle`.
   - Проверка: расстояние центр-центр < `LOOT.PICKUP_RADIUS`.
   - Если ОК: `LootState = reserved`, `reservedBy = playerEid`, `reserveTimer = LOOT.RESERVE_TIMEOUT`.
-- [ ] **Попытка подбора** (при `reserved` и условия мира ОК):
+- [x] **Попытка подбора** (при `reserved` и условия мира ОК):
   - Пока нет `InventoryService` (run-20): прямой инкремент счётчика (как сейчас), но через **`LootGranted`** event.
   - `LootState = picked` → сразу `LootState = despawning`, `DespawnTimer = LOOT.DESPAWN_TIME`.
-- [ ] **`LootGranted`** event в `GameEventQueues`:
+- [x] **`LootGranted`** event в `GameEventQueues`:
   - Добавить в queues: `emitLootGranted(...)`.
   - Тип: `{ tickId, entityId, itemKind?, pickerEid }`.
   - Consumer (фаза 3): обработка инвентаря (пока просто счётчик золота).
-- [ ] **Допустимые переходы** (жёстко):
+- [x] **Допустимые переходы** (жёстко):
   - `idle → reserved → picked → despawning → removeEntity`.
   - `reserved → idle` (timeout, tryAddItem fail, reservedBy не существует).
   - ❌ `picked → idle`, `despawning → idle` — запрещено.
 
 ### Визуал лута (замена жёлтого квадрата на иконку)
-- [ ] Создать `src/render/itemAtlas.ts` по шаблону выше.
-- [ ] Вызвать `loadItemAtlas()` при инициализации (рядом с загрузкой карты).
-- [ ] Убедиться, что `assets/icons/items.png` синкается в `apps/client/public/assets/icons/` (`make assets-sync` или Makefile).
-- [ ] Заменить `createLootGraphics()` (жёлтый квадрат) на `createLootSprite(itemId)`:
+- [x] Создать `src/render/itemAtlas.ts` по шаблону выше.
+- [x] Вызвать `loadItemAtlas()` при инициализации (рядом с загрузкой карты).
+- [x] Убедиться, что `assets/icons/items.png` синкается в `apps/client/public/assets/icons/` (`make assets-sync` или Makefile).
+- [x] Заменить `createLootGraphics()` (жёлтый квадрат) на `createLootSprite(itemId)`:
   ```ts
   // render/lootVisual.ts
   import { Sprite } from 'pixi.js';
@@ -113,19 +113,19 @@ export function getItemIcon(id: ItemIconId): Texture {
     return sprite;
   }
   ```
-- [ ] Обновить `mountLootVisual.ts` / `createLootVisualAt` — принимать `itemId`, вызывать `createLootSprite(itemId)` вместо `createLootGraphics()`.
-- [ ] Пока единственный тип лута — `'gold'`; при спавне передавать `'gold'` как itemId.
+- [x] Обновить `mountLootVisual.ts` / `createLootVisualAt` — принимать `itemId`, вызывать `createLootSprite(itemId)` вместо `createLootGraphics()`.
+- [x] Пока единственный тип лута — `'gold'`; при спавне передавать `'gold'` как itemId.
 
 ### Despawning VFX
-- [ ] **Despawning VFX** в RenderSync:
+- [x] **Despawning VFX** в RenderSync:
   - При `LootState === despawning`: плавный fade (`alpha = timer / LOOT.DESPAWN_TIME`).
   - По желанию: уменьшение scale.
-- [ ] **Удаление entity** по таймеру:
+- [x] **Удаление entity** по таймеру:
   - `DespawnTimer -= dt`; при `<= 0` → `removeEntity` + очистка реестра.
 
 ### Подбор по радиусу (замена AABB)
-- [ ] Вместо пересечения хитбоксов — `distance(playerCenter, lootCenter) < PICKUP_RADIUS`.
-- [ ] Тап по луту (опционально): `POINTER_TAP` → hit-test по экранным координатам лута → intent подбора если в радиусе.
+- [x] Вместо пересечения хитбоксов — `distance(playerCenter, lootCenter) < PICKUP_RADIUS`.
+- [x] Тап по луту (опционально): `POINTER_TAP` → hit-test по экранным координатам лута → intent подбора если в радиусе.
 
 ## Ограничения
 
