@@ -30,6 +30,19 @@ export const ENEMY = {
   VISUAL_COLOR: 0xcc3333,
 } as const;
 
+/** Враг: агро, think, скорость (run-18, post-mvp фаза 3). */
+export const AI = {
+  AGGRO_RADIUS: 150,
+  ATTACK_RANGE: 52,
+  THINK_INTERVAL_MIN: 0.1,
+  THINK_INTERVAL_MAX: 0.3,
+  THINK_PHASE_N: 4,
+  /** Доля скорости игрока (~60%). */
+  MOVE_SPEED: PLAYER.SPEED * 0.6,
+  STUCK_MOVE_EPS: 0.35,
+  STUCK_TIME_THRESHOLD: 0.5,
+} as const;
+
 export const LOOT = {
   HITBOX_SIZE: 24,
   VISUAL_SIZE: 20,

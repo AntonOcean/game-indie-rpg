@@ -11,14 +11,15 @@
  * 4. `runHealthSystem` — чтение `getDamageEvents()` (processing), идемпотентность, `clearProcessing`
  * 5. Death — death-клип + `DeathSequence`; `Dead`/лут после `ANIMATION_COMPLETE` (шаг 0 след. кадра)
  * 6. Loot pickup
- * 7. Intent → скорость (`resolvePlayerIntentToVelocity`)
- * 8. Movement + collision (`movePlayerWithTileCollisions` с `gameTime.dt`)
- * 9. Locomotion animation intent → Facing → `runAnimationSystem` (dt из GameTime)
- * 10. RenderSync + `RenderAdapter.poll()` → mailbox на следующий кадр
- * 11. Camera, HP bars, debug
- * 12. `queues.swap()`, периодический `processedEvents.cleanup`, `gameTime.tickId++`
+ * 7. Intent → скорость игрока; враги — `applyEnemyVelocityFromAI` (состояние с конца прошлого кадра)
+ * 8. Movement + collision: игрок + `moveEnemiesWithTileCollisions`
+ * 9. `updateStuckDetectorsAfterMovement` → `runAIThinkSystem` → `syncEnemyVelocityAfterAIThink`
+ * 10. Locomotion animation intent → Facing → `runAnimationSystem` (dt из GameTime)
+ * 11. RenderSync + `RenderAdapter.poll()` → mailbox на следующий кадр
+ * 12. Camera, HP bars, debug
+ * 13. `queues.swap()`, периодический `processedEvents.cleanup`, `gameTime.tickId++`
  *
- * AI — фаза 5 в architecture; пока нет.
+ * AI think — после движения (architecture фаза 5); скорость врага выставляется до движения.
  */
 export const GAME_PIPELINE_ORDER = [
   "render_events_consume",
@@ -28,9 +29,11 @@ export const GAME_PIPELINE_ORDER = [
   "health_apply_damage",
   "death",
   "loot_pickup",
+  "enemy_velocity_from_ai",
   "intent_resolve",
   "movement",
-  "collision",
+  "enemy_movement",
+  "stuck_ai_think",
   "locomotion_animation_intent",
   "facing_from_velocity",
   "animation_system",

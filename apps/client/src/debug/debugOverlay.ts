@@ -2,6 +2,7 @@ import { query, hasComponent, type World } from "bitecs";
 import { Container, Graphics, Text, type Container as PixiContainer } from "pixi.js";
 import { animStateLabel } from "../animation/animationTypes";
 import { LOOT } from "../constants/gameBalance";
+import { AI, AIState } from "../ecs/components/ai";
 import type { GameTime } from "../ecs/gameTime";
 import {
   Animation,
@@ -19,6 +20,8 @@ import {
 const HITBOX_FILL = { color: 0x44ff88, alpha: 0.14 } as const;
 const HITBOX_STROKE = { width: 1, color: 0x66ffaa, alpha: 0.85 } as const;
 const PICKUP_RADIUS_STROKE = { width: 1, color: 0xffcc00, alpha: 0.75 } as const;
+const AI_AGGRO_STROKE = { width: 1, color: 0x88ccff, alpha: 0.55 } as const;
+const AI_ATTACK_STROKE = { width: 1, color: 0xff6688, alpha: 0.65 } as const;
 
 const labelStyle = {
   fontFamily: "system-ui, sans-serif",
@@ -66,7 +69,20 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
 
   const enemyHpPool: Text[] = [];
   const animLabelPool: Text[] = [];
+  const aiLabelPool: Text[] = [];
   const lootLabelPool: Text[] = [];
+
+  function ensureAiLabel(index: number): Text {
+    let t = aiLabelPool[index];
+    if (!t) {
+      t = new Text({ text: "", style: labelStyle });
+      t.eventMode = "none";
+      t.anchor.set(0.5, 0);
+      aiLabelPool.push(t);
+      root.addChild(t);
+    }
+    return t;
+  }
 
   function ensureLootLabel(index: number): Text {
     let t = lootLabelPool[index];
@@ -163,6 +179,31 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
       }
       for (let j = hpIndex; j < enemyHpPool.length; j++) {
         enemyHpPool[j]!.visible = false;
+      }
+
+      let aiIndex = 0;
+      const withAi = query(world, [Enemy, AI, Position]);
+      for (let i = 0; i < withAi.length; i++) {
+        const eid = withAi[i]!;
+        if (hasComponent(world, eid, Dead)) {
+          continue;
+        }
+        const cx = Position.x[eid];
+        const cy = Position.y[eid];
+        const rAgg = AI.aggroRadius[eid];
+        const rAtk = AI.attackRange[eid];
+        hitGfx.circle(cx, cy, rAgg).stroke(AI_AGGRO_STROKE);
+        hitGfx.circle(cx, cy, rAtk).stroke(AI_ATTACK_STROKE);
+        const st = AI.state[eid];
+        const stLabel =
+          st === AIState.Idle ? "idle" : st === AIState.Chase ? "chase" : "attack";
+        const aiLab = ensureAiLabel(aiIndex++);
+        aiLab.text = `ai: ${stLabel}  off=${AI.thinkOffset[eid]}`;
+        aiLab.position.set(cx, cy - rAgg - 6);
+        aiLab.visible = true;
+      }
+      for (let j = aiIndex; j < aiLabelPool.length; j++) {
+        aiLabelPool[j]!.visible = false;
       }
 
       let animIndex = 0;

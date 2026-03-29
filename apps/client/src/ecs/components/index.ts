@@ -15,3 +15,5 @@ export { DespawnTimer } from "./despawnTimer";
 export { LootItemKind, LootItemKindEnum } from "./lootItemKind";
 export { Animation } from "./animation";
 export { Facing } from "./facing";
+export { AI, AIState } from "./ai";
+export { StuckDetector } from "./stuckDetector";

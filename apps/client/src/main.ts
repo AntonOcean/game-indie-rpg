@@ -21,9 +21,16 @@ import {
   resolveCombatAndEmitDamage,
 } from "./ecs/playerCombat";
 import {
-  movePlayerWithTileCollisions,
+  moveEntityWithTileCollisions,
   resolvePlayerIntentToVelocity,
 } from "./ecs/playerLocomotion";
+import {
+  applyEnemyVelocityFromAI,
+  moveEnemiesWithTileCollisions,
+  runAIThinkSystem,
+  syncEnemyVelocityAfterAIThink,
+  updateStuckDetectorsAfterMovement,
+} from "./ecs/aiSystem";
 import { runAnimationSystem } from "./ecs/animationSystem";
 import { updateFacingFromVelocity } from "./ecs/facingSystem";
 import { enqueueLocomotionAnimationRequests } from "./ecs/locomotionAnimationIntent";
@@ -176,8 +183,18 @@ async function main(): Promise<void> {
       pendingDestroyRenderIds
     );
 
+    applyEnemyVelocityFromAI(ecsWorld, playerEid, gameTime);
     resolvePlayerIntentToVelocity(playerEid, intent);
-    movePlayerWithTileCollisions(playerEid, meta, gameTime.dt);
+    moveEntityWithTileCollisions(playerEid, meta, gameTime.dt);
+    moveEnemiesWithTileCollisions(ecsWorld, meta, gameTime.dt);
+    updateStuckDetectorsAfterMovement(ecsWorld, gameTime);
+    runAIThinkSystem(
+      ecsWorld,
+      playerEid,
+      gameTime,
+      animationIntentBuffer
+    );
+    syncEnemyVelocityAfterAIThink(ecsWorld);
 
     enqueueLocomotionAnimationRequests(ecsWorld, animationIntentBuffer);
     updateFacingFromVelocity(ecsWorld);

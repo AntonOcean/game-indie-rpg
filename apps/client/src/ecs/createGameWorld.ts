@@ -1,5 +1,6 @@
 import { createWorld, registerComponents, type World } from "bitecs";
 import {
+  AI,
   Animation,
   AttackCooldown,
   Dead,
@@ -16,6 +17,7 @@ import {
   Player,
   Position,
   RenderRef,
+  StuckDetector,
   Velocity,
 } from "./components";
 
@@ -39,6 +41,8 @@ export function createGameWorld(): World {
     LootItemKind,
     Animation,
     Facing,
+    AI,
+    StuckDetector,
   ]);
   return world;
 }

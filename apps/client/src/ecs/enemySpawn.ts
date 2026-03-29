@@ -1,12 +1,24 @@
 import { addComponent, addEntity, type World } from "bitecs";
-import { ENEMY } from "../constants/gameBalance";
+import { AI as AICfg, ENEMY } from "../constants/gameBalance";
 import type { GameMapMeta } from "../gameMap";
-import { Enemy, Health, Hitbox, Position, RenderRef } from "./components";
+import {
+  AI,
+  AIState,
+  Enemy,
+  Health,
+  Hitbox,
+  Position,
+  RenderRef,
+  StuckDetector,
+  Velocity,
+} from "./components";
 import { addCharacterAnimationFacing } from "./initCharacterVisualAnimation";
 import { tileCenterWorldPx } from "./playerSpawn";
 
 /** Предпочтительная клетка врага; при блоке ищется ближайшая проходимая (BFS). */
 const ENEMY_SPAWN_PREFERRED_TILE = { tx: 20, ty: 10 } as const;
+
+let enemySpawnIndex = 0;
 
 export function pickWalkableSpawnTile(
   meta: GameMapMeta,
@@ -69,6 +81,25 @@ export function spawnEnemyEntity(
   addComponent(world, eid, Health);
   Health.current[eid] = ENEMY.HP;
   Health.max[eid] = ENEMY.HP;
+
+  addComponent(world, eid, Velocity);
+  Velocity.vx[eid] = 0;
+  Velocity.vy[eid] = 0;
+
+  const spawnIx = enemySpawnIndex++;
+  addComponent(world, eid, AI);
+  AI.state[eid] = AIState.Idle;
+  AI.targetId[eid] = 0;
+  AI.aggroRadius[eid] = AICfg.AGGRO_RADIUS;
+  AI.attackRange[eid] = AICfg.ATTACK_RANGE;
+  AI.nextThinkTime[eid] = 0;
+  AI.thinkOffset[eid] = spawnIx % AICfg.THINK_PHASE_N;
+  AI.thinkSeed[eid] = spawnIx * 9973 + 1;
+
+  addComponent(world, eid, StuckDetector);
+  StuckDetector.lastX[eid] = x;
+  StuckDetector.lastY[eid] = y;
+  StuckDetector.stuckTime[eid] = 0;
 
   addCharacterAnimationFacing(world, eid, "orc");
 

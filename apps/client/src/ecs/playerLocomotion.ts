@@ -43,9 +43,9 @@ export function resolvePlayerIntentToVelocity(
 
 /**
  * Пробное смещение по X, затем по Y; при пересечении с блокирующим тайлом — откат оси
- * (четыре угла хитбокса, implementation-plan §3).
+ * (четыре угла хитбокса, implementation-plan §3). Игрок и враги — одна логика (run-18).
  */
-export function movePlayerWithTileCollisions(
+export function moveEntityWithTileCollisions(
   eid: number,
   meta: GameMapMeta,
   dtSec: number
@@ -77,3 +77,6 @@ export function movePlayerWithTileCollisions(
     Position.y[eid] = oldY;
   }
 }
+
+/** @deprecated Используйте `moveEntityWithTileCollisions` — то же поведение. */
+export const movePlayerWithTileCollisions = moveEntityWithTileCollisions;
