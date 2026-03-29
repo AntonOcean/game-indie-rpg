@@ -2,10 +2,22 @@ import { hasComponent, query, type World } from "bitecs";
 import { Sprite, type Texture } from "pixi.js";
 import { AnimState, FacingDir } from "../animation/animationTypes";
 import { getCharacterVisualKind } from "../ecs/characterVisualKind";
-import { Animation, Dead, Enemy, Facing, Position, RenderRef } from "../ecs/components";
+import {
+  Animation,
+  Dead,
+  Enemy,
+  Facing,
+  Position,
+  RenderRef,
+} from "../ecs/components";
 import { characterSpriteWorldScale } from "../constants/characterAssets";
+import type { CharacterAnimRow } from "./loadCharacterAnimationTextures";
 import type { CharacterAnimationFrames } from "./loadCharacterAnimationTextures";
+import type { RenderAdapter } from "./renderAdapter";
 import type { RenderRegistry } from "./renderRegistry";
+
+/** Дедуп push ANIMATION_COMPLETE на поколение клипа (см. Animation.clipGeneration). */
+const lastAnimCompletePushedGen = new Map<number, number>();
 
 function frameIndexForAnimation(eid: number, framesLen: number): number {
   const loop = Animation.loop[eid] !== 0;
@@ -25,14 +37,40 @@ function frameIndexForAnimation(eid: number, framesLen: number): number {
   return Math.min(framesLen - 1, Math.floor(raw));
 }
 
-function rowForVisualState(
-  row: CharacterAnimationFrames["soldier"],
-  state: number
-): Texture[] {
-  if (state === AnimState.Walk && row.walk.length > 0) {
-    return row.walk;
+function rowForVisualState(row: CharacterAnimRow, state: number): Texture[] {
+  switch (state) {
+    case AnimState.Walk:
+      return row.walk.length > 0 ? row.walk : row.idle;
+    case AnimState.Attack:
+      return row.attack.length > 0 ? row.attack : row.idle;
+    case AnimState.Hurt:
+      return row.hurt.length > 0 ? row.hurt : row.idle;
+    case AnimState.Death:
+      return row.death.length > 0 ? row.death : row.idle;
+    default:
+      return row.idle.length > 0 ? row.idle : row.walk;
   }
-  return row.idle.length > 0 ? row.idle : row.walk;
+}
+
+function maybePushAnimationComplete(
+  adapter: RenderAdapter,
+  eid: number
+): void {
+  const loop = Animation.loop[eid] !== 0;
+  if (loop) {
+    return;
+  }
+  const dur = Animation.duration[eid];
+  const t = Animation.time[eid];
+  if (dur <= 0 || t < dur) {
+    return;
+  }
+  const gen = Animation.clipGeneration[eid] | 0;
+  if (lastAnimCompletePushedGen.get(eid) === gen) {
+    return;
+  }
+  lastAnimCompletePushedGen.set(eid, gen);
+  adapter.push({ type: "ANIMATION_COMPLETE", entity: eid });
 }
 
 /**
@@ -42,7 +80,8 @@ export function runRenderSystem(
   world: World,
   registry: RenderRegistry,
   pendingDestroyRenderIds: number[],
-  animFrames: CharacterAnimationFrames
+  animFrames: CharacterAnimationFrames,
+  renderAdapter: RenderAdapter
 ): void {
   for (let i = 0; i < pendingDestroyRenderIds.length; i++) {
     const id = pendingDestroyRenderIds[i];
@@ -96,6 +135,8 @@ export function runRenderSystem(
     }
     const fi = frameIndexForAnimation(eid, texRow.length);
     node.texture = texRow[fi]!;
+
+    maybePushAnimationComplete(renderAdapter, eid);
 
     const flip = Facing.direction[eid] === FacingDir.Left;
     node.scale.set(flip ? -baseScale : baseScale, baseScale);

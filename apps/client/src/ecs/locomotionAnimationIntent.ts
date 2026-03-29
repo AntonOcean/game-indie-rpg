@@ -4,7 +4,7 @@ import {
   mergeAnimationIntent,
   type AnimationIntentBuffer,
 } from "../animation/animationIntentBuffer";
-import { Animation, Dead, Velocity } from "./components";
+import { Animation, Dead, DeathSequence, Velocity } from "./components";
 
 const SPEED_EPS = 1e-4;
 
@@ -20,6 +20,9 @@ export function enqueueLocomotionAnimationRequests(
   for (let i = 0; i < entities.length; i++) {
     const eid = entities[i]!;
     if (hasComponent(world, eid, Dead)) {
+      continue;
+    }
+    if (hasComponent(world, eid, DeathSequence)) {
       continue;
     }
 

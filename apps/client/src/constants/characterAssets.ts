@@ -13,6 +13,12 @@ export const CHARACTER_SHEET = {
   ORC_IDLE_URL: "/assets/characters/orc/Orc-Idle.png",
   SOLDIER_WALK_URL: "/assets/characters/soldier/Soldier-Walk.png",
   ORC_WALK_URL: "/assets/characters/orc/Orc-Walk.png",
+  SOLDIER_ATTACK_URL: "/assets/characters/soldier/Soldier-Attack01.png",
+  ORC_ATTACK_URL: "/assets/characters/orc/Orc-Attack01.png",
+  SOLDIER_HURT_URL: "/assets/characters/soldier/Soldier-Hurt.png",
+  ORC_HURT_URL: "/assets/characters/orc/Orc-Hurt.png",
+  SOLDIER_DEATH_URL: "/assets/characters/soldier/Soldier-Death.png",
+  ORC_DEATH_URL: "/assets/characters/orc/Orc-Death.png",
 } as const;
 
 /** Масштаб кадра 100×100 → высота в мире `CHARACTER.SPRITE_WORLD_HEIGHT_PX` (как тайл 32). */

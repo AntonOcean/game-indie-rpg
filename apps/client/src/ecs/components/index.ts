@@ -7,6 +7,7 @@ export { Enemy } from "./enemy";
 export { Health } from "./health";
 export { AttackCooldown } from "./attackCooldown";
 export { Dead } from "./dead";
+export { DeathSequence } from "./deathSequence";
 export { Loot } from "./loot";
 export { Animation } from "./animation";
 export { Facing } from "./facing";

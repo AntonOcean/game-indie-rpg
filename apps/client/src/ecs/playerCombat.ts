@@ -4,6 +4,11 @@ import {
   sendPlayerEvent,
   type AttackPayload,
 } from "game-rpg-protocol";
+import { AnimState } from "../animation/animationTypes";
+import {
+  mergeAnimationIntent,
+  type AnimationIntentBuffer,
+} from "../animation/animationIntentBuffer";
 import { PLAYER } from "../constants/gameBalance";
 import type { PlayerIntent } from "../input/playerIntent";
 import {
@@ -26,7 +31,8 @@ export function resolvePlayerAttack(
   world: World,
   playerEid: number,
   intent: PlayerIntent,
-  nowMs: number
+  nowMs: number,
+  animationBuffer: AnimationIntentBuffer
 ): void {
   const target = intent.attackTarget;
   if (target === null) {
@@ -63,6 +69,11 @@ export function resolvePlayerAttack(
 
   Health.current[target] -= PLAYER.ATTACK_DAMAGE;
   AttackCooldown.untilMs[playerEid] = nowMs + PLAYER.ATTACK_COOLDOWN_MS;
+
+  mergeAnimationIntent(animationBuffer, {
+    entity: playerEid,
+    state: AnimState.Attack,
+  });
 
   const payload: AttackPayload = { targetId: target };
   sendPlayerEvent({ type: PlayerEventType.ATTACK, payload });

@@ -24,8 +24,40 @@ function applyClipToAnimation(
   Animation.locked[eid] = clip.locked;
   Animation.minHoldTime[eid] = clip.minHoldTime;
   Animation.interruptAt[eid] = clip.interruptAt;
+  Animation.clipGeneration[eid] = (Animation.clipGeneration[eid] | 0) + 1;
   const lf = clip.lockFacing ?? clip.locked;
   Facing.locked[eid] = lf;
+}
+
+/**
+ * Attack: facing и FSM-lock только до interruptAt (architecture: locked до interruptAt).
+ * Death остаётся с clip.locked на весь клип.
+ */
+function syncAttackFacingAndFsmLock(world: World): void {
+  const movers = query(world, [Animation, Facing]);
+  for (let i = 0; i < movers.length; i++) {
+    const eid = movers[i]!;
+    if (Animation.state[eid] !== AnimState.Attack) {
+      continue;
+    }
+    const kind = getCharacterVisualKind(world, eid);
+    if (!kind) {
+      continue;
+    }
+    const clip = getAnimationClip(kind, AnimState.Attack);
+    if (!clip) {
+      continue;
+    }
+    const dur = Animation.duration[eid];
+    const progress = dur > 0 ? Animation.time[eid] / dur : 1;
+    const beforeInterrupt = progress < clip.interruptAt;
+    if (clip.locked) {
+      Animation.locked[eid] = beforeInterrupt ? 1 : 0;
+    }
+    if (clip.lockFacing) {
+      Facing.locked[eid] = beforeInterrupt ? 1 : 0;
+    }
+  }
 }
 
 function resolveClipWithFallback(
@@ -143,6 +175,8 @@ export function runAnimationSystem(
   }
 
   buffer.clear();
+
+  syncAttackFacingAndFsmLock(world);
 
   const sanity = query(world, [Animation]);
   for (let i = 0; i < sanity.length; i++) {

@@ -21,6 +21,7 @@ export function addCharacterAnimationFacing(
   Animation.locked[eid] = clip.locked;
   Animation.minHoldTime[eid] = clip.minHoldTime;
   Animation.interruptAt[eid] = clip.interruptAt;
+  Animation.clipGeneration[eid] = 0;
   Facing.direction[eid] = FacingDir.Right;
   Facing.locked[eid] = clip.lockFacing ?? clip.locked;
 }

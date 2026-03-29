@@ -3,7 +3,7 @@ import { CHARACTER_SHEET } from "../constants/characterAssets";
 
 /**
  * Данные клипа: длительность цикла (сек), loop, порог прерывания, анти-дребезг.
- * attack/hurt/death заполнены для FSM; текстуры подключатся в run-14.
+ * attack/hurt/death — клипы + текстуры (run-14).
  */
 export type AnimationClipDef = {
   duration: number;
@@ -57,8 +57,8 @@ const soldierOrcShared = {
   hurt: {
     duration: 0.35,
     loop: 0,
-    interruptAt: 1,
-    minHoldTime: 0,
+    interruptAt: 0.7,
+    minHoldTime: 0.1,
     framesCount: 4,
     frameWidth: FW,
     frameHeight: FH,
@@ -69,7 +69,7 @@ const soldierOrcShared = {
     loop: 0,
     interruptAt: 1,
     minHoldTime: 0,
-    framesCount: 6,
+    framesCount: 4,
     frameWidth: FW,
     frameHeight: FH,
     locked: 1,
