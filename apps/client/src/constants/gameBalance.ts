@@ -65,6 +65,11 @@ export const INVENTORY = {
 
 export const ITEMS = {
   GOLD: "gold",
+  POTION_HP: "potion_hp",
+} as const;
+
+export const POTION_HP = {
+  HEAL_AMOUNT: 30,
 } as const;
 
 export const CAMERA = {

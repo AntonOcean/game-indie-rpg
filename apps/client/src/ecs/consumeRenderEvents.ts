@@ -40,11 +40,15 @@ export function consumeDeferredRenderEvents(
   animationBuffer: AnimationIntentBuffer,
   spawnLootAt: (worldX: number, worldY: number) => void,
   playerEid: number,
+  canAcceptGameplayInput: () => boolean,
   onPlayerDeathAnimationComplete?: () => void
 ): void {
   for (let i = 0; i < events.length; i++) {
     const ev = events[i]!;
     if (ev.type === "POINTER_TAP") {
+      if (!canAcceptGameplayInput()) {
+        continue;
+      }
       const leid = pickLootEntityAtWorld(world, ev.worldX, ev.worldY);
       if (leid >= 0) {
         const lx = Position.x[leid];

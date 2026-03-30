@@ -5,6 +5,7 @@ import {
   Loot,
   LootItemKind,
   LootItemKindEnum,
+  LootItemQty,
   LootReserve,
   LootState,
   LootStateEnum,
@@ -16,7 +17,9 @@ export function spawnLootEntity(
   world: World,
   renderId: number,
   worldX: number,
-  worldY: number
+  worldY: number,
+  kind: (typeof LootItemKindEnum)[keyof typeof LootItemKindEnum],
+  quantity: number
 ): number {
   const eid = addEntity(world);
   addComponent(world, eid, Loot);
@@ -26,7 +29,9 @@ export function spawnLootEntity(
   LootReserve.reservedBy[eid] = 0;
   LootReserve.reserveTimer[eid] = 0;
   addComponent(world, eid, LootItemKind);
-  LootItemKind.kind[eid] = LootItemKindEnum.Gold;
+  LootItemKind.kind[eid] = kind;
+  addComponent(world, eid, LootItemQty);
+  LootItemQty.quantity[eid] = Math.max(1, Math.floor(quantity));
 
   addComponent(world, eid, Position);
   Position.x[eid] = worldX;

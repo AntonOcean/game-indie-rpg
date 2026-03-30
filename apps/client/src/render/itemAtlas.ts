@@ -12,6 +12,13 @@ export type ItemIconId = keyof typeof ITEM_ICONS;
 let baseTexture: Texture | null = null;
 const cache = new Map<ItemIconId, Texture>();
 
+export function getItemIconFramePx(
+  id: ItemIconId
+): { x: number; y: number; size: number } {
+  const def = ITEM_ICONS[id];
+  return { x: def.col * TILE, y: def.row * TILE, size: TILE };
+}
+
 export async function loadItemAtlas(): Promise<void> {
   baseTexture = await Assets.load("/assets/icons/items.png");
 }

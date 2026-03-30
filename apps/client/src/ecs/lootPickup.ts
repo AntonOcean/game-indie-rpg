@@ -16,6 +16,7 @@ import {
   Loot,
   LootItemKind,
   LootItemKindEnum,
+  LootItemQty,
   LootReserve,
   LootState,
   LootStateEnum,
@@ -36,6 +37,9 @@ function distanceCenters(
 function lootItemKindString(kind: number): string | undefined {
   if (kind === LootItemKindEnum.Gold) {
     return ITEMS.GOLD;
+  }
+  if (kind === LootItemKindEnum.PotionHp) {
+    return ITEMS.POTION_HP;
   }
   return undefined;
 }
@@ -83,6 +87,7 @@ export function runLootSystem(
     LootState,
     LootReserve,
     LootItemKind,
+    LootItemQty,
     Position,
     Hitbox,
     RenderRef,
@@ -124,7 +129,8 @@ export function runLootSystem(
           continue;
         }
 
-        const r = inventoryService.tryAddItem(itemKind, 1);
+        const qty = LootItemQty.quantity[leid] ?? 1;
+        const r = inventoryService.tryAddItem(itemKind, qty);
         if (!r.ok) {
           LootState.state[leid] = LootStateEnum.Idle;
           LootReserve.reservedBy[leid] = 0;

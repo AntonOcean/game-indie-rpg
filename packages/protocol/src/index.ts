@@ -24,7 +24,8 @@ export type AttackPayload = {
 
 /** Использование предмета в слоте; сервер проверит наличие и контекст. */
 export type UseItemPayload = {
-  slotIndex: number;
+  itemId: string;
+  slotIndex?: number;
 };
 
 export type PlayerEvent =

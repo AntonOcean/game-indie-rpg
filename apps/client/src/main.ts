@@ -3,7 +3,7 @@ import "./protocol";
 import { Application } from "pixi.js";
 import { hasComponent } from "bitecs";
 import { applyWorldScale, updateWorldCamera } from "./camera/worldCamera";
-import { CAMERA, ENGINE, ITEMS } from "./constants/gameBalance";
+import { CAMERA, ENGINE, ITEMS, PLAYER } from "./constants/gameBalance";
 import { bindDebugOverlayToggle, createDebugOverlay } from "./debug/debugOverlay";
 import { createGameWorld } from "./ecs/createGameWorld";
 import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
@@ -56,6 +56,9 @@ import { runRenderSystem } from "./render/renderSystem";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
 import { createInventoryService } from "./state/inventoryService";
 import { createPlayerState } from "./state/playerState";
+import { createInventoryOverlay } from "./ui/inventoryOverlay";
+import { rollLoot } from "./data/lootTable";
+import { LootItemKindEnum } from "./ecs/components";
 
 async function main(): Promise<void> {
   const host = document.querySelector<HTMLDivElement>("#app");
@@ -128,6 +131,9 @@ async function main(): Promise<void> {
     }),
     (wx, wy) => pickEnemyAtWorld(ecsWorld, wx, wy),
     (wx, wy) => {
+      if (!canAcceptGameplayInput()) {
+        return;
+      }
       renderAdapter.push({ type: "POINTER_TAP", worldX: wx, worldY: wy });
     }
   );
@@ -175,15 +181,53 @@ async function main(): Promise<void> {
   let gameOverShown = false;
 
   const spawnLootAt = (wx: number, wy: number): void => {
-    const lootRenderId = createLootVisualAt(
-      worldRoot,
-      renderRegistry,
-      wx,
-      wy,
-      ITEMS.GOLD
-    );
-    spawnLootEntity(ecsWorld, lootRenderId, wx, wy);
+    const drops = rollLoot("orc", 0xabcddcba, gameTime.tickId);
+    const spread = 10;
+    for (let i = 0; i < drops.length; i++) {
+      const d = drops[i]!;
+      const ox = (i - (drops.length - 1) / 2) * spread;
+      const oy = ((i % 2 === 0 ? -1 : 1) * spread) / 2;
+
+      const lootRenderId = createLootVisualAt(
+        worldRoot,
+        renderRegistry,
+        wx + ox,
+        wy + oy,
+        d.itemId
+      );
+      const kind =
+        d.itemId === ITEMS.POTION_HP ? LootItemKindEnum.PotionHp : LootItemKindEnum.Gold;
+      spawnLootEntity(ecsWorld, lootRenderId, wx + ox, wy + oy, kind, d.quantity);
+    }
   };
+
+  const inventoryOverlay = createInventoryOverlay({
+    inventoryService,
+    ecsWorld,
+    playerEid,
+    getPlayerMaxHp: () => PLAYER.MAX_HP,
+  });
+
+  const inventoryButton = document.createElement("button");
+  inventoryButton.id = "hud-inventory-button";
+  inventoryButton.textContent = "Inventory";
+  inventoryButton.style.position = "fixed";
+  inventoryButton.style.right = "12px";
+  inventoryButton.style.top = "12px";
+  inventoryButton.style.zIndex = "15";
+  inventoryButton.style.padding = "10px 12px";
+  inventoryButton.style.borderRadius = "12px";
+  inventoryButton.style.border = "1px solid rgba(255,255,255,0.12)";
+  inventoryButton.style.background = "rgba(22, 22, 38, 0.75)";
+  inventoryButton.style.color = "#e8e8ef";
+  inventoryButton.style.font = "800 13px/1 system-ui, sans-serif";
+  inventoryButton.style.cursor = "pointer";
+  inventoryButton.style.touchAction = "manipulation";
+  inventoryButton.addEventListener("click", () => inventoryOverlay.toggle());
+  document.body.appendChild(inventoryButton);
+
+  const canAcceptGameplayInput = (): boolean =>
+    !inventoryOverlay.isOpen() && !gameOverShown;
 
   app.ticker.add(() => {
     const renderEventsFromLastFrame = renderEventMailbox.splice(0);
@@ -193,6 +237,7 @@ async function main(): Promise<void> {
       animationIntentBuffer,
       spawnLootAt,
       playerEid,
+      canAcceptGameplayInput,
       () => {
         if (gameOverShown) {
           return;
@@ -210,9 +255,11 @@ async function main(): Promise<void> {
       hasComponent(ecsWorld, playerEid, CombatState) &&
       CombatState.state[playerEid] === CombatStateEnum.dead;
 
-    if (!playerCombatDeadAtStart) {
+    if (!playerCombatDeadAtStart && canAcceptGameplayInput()) {
       input.fillIntent(intent);
       collectPlayerAttackIntents(ecsWorld, playerEid, intent, attackIntents);
+    } else {
+      input.fillIntent(emptyPlayerIntent());
     }
 
     collectEnemyAttackIntents(
@@ -255,7 +302,7 @@ async function main(): Promise<void> {
     );
 
     applyEnemyVelocityFromAI(ecsWorld, playerEid, gameTime);
-    if (!playerCombatDeadNow) {
+    if (!playerCombatDeadNow && canAcceptGameplayInput()) {
       resolvePlayerIntentToVelocity(playerEid, intent);
       moveEntityWithTileCollisions(playerEid, meta, gameTime.dt);
     } else {
@@ -296,6 +343,9 @@ async function main(): Promise<void> {
       const s = inventoryService.getInventory().find((x) => x.itemId === ITEMS.GOLD);
       const qty = s?.quantity ?? 0;
       goldHud.textContent = `Gold: ${qty}`;
+    }
+    if (inventoryOverlay.isOpen()) {
+      inventoryOverlay.refresh();
     }
 
     eventQueues.swap();

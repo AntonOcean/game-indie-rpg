@@ -13,6 +13,7 @@ export { LootState, LootStateEnum, lootStateLabel } from "./lootState";
 export { LootReserve } from "./lootReserve";
 export { DespawnTimer } from "./despawnTimer";
 export { LootItemKind, LootItemKindEnum } from "./lootItemKind";
+export { LootItemQty } from "./lootItemQty";
 export { Animation } from "./animation";
 export { Facing } from "./facing";
 export { AI, AIState } from "./ai";
