@@ -34,45 +34,45 @@ Run-22: полный геймплейный цикл с сейвом.
 ## Задачи (чек-лист)
 
 ### Audio Manager
-- [ ] **`src/audio/audioManager.ts`:**
+- [x] **`apps/client/src/audio/audioManager.ts`:**
   - Управление Web Audio API `AudioContext`.
   - `play(soundId: string)` — воспроизвести SFX.
   - `setMuted(muted: boolean)`.
   - `isMuted(): boolean`.
   - Пул аудиоисточников (не создавать новый `Audio` / `BufferSource` на каждый вызов).
-- [ ] **Autoplay unlock:**
+- [x] **Autoplay unlock:**
   - `AudioContext` создаётся в `suspended` state.
   - На первый `pointerdown` / `touchstart` → `context.resume()`.
   - До resume: `play()` — no-op или буферизация.
-- [ ] Предзагрузка звуков при инициализации (fetch + decodeAudioData).
+- [x] Предзагрузка звуков при инициализации (fetch + decodeAudioData).
 
 ### Звуковые файлы
-- [ ] Использовать **уже лежащие** в `assets/audio/*.wav` (см. таблицу выше; при отсутствии — скопировать из `full-assets/RPG Sound Pack/` по той же таблице).
-- [ ] Убедиться, что после `make assets-sync` файлы есть в `apps/client/public/assets/audio/`.
-- [ ] Загрузить через `fetch('/assets/audio/attack.wav')` и т.д. при старте (или лениво при первом `play`).
-- [ ] В коде использовать **идентификаторы**, совпадающие с именами файлов без расширения: `attack`, `hurt`, `pickup`, `enemy-death`, `player-death`, `ui-click`.
+- [x] Использовать **уже лежащие** в `assets/audio/*.wav` (см. таблицу выше; при отсутствии — скопировать из `full-assets/RPG Sound Pack/` по той же таблице).
+- [x] Убедиться, что после `make assets-sync` файлы есть в `apps/client/public/assets/audio/`.
+- [x] Загрузить через `fetch('/assets/audio/attack.wav')` и т.д. при старте (или лениво при первом `play`).
+- [x] В коде использовать **идентификаторы**, совпадающие с именами файлов без расширения: `attack`, `hurt`, `pickup`, `enemy-death`, `player-death`, `ui-click`.
 
 ### Интеграция в игровой цикл
-- [ ] **Атака игрока** (успешный DamageEvent с sourceId=player): `audioManager.play('attack')`.
-- [ ] **Урон по игроку** (DamageEvent с targetId=player): `audioManager.play('hurt')`.
-- [ ] **Подбор лута** (LootGranted): `audioManager.play('pickup')`.
-- [ ] **Смерть врага** (CombatState → dead): `audioManager.play('enemy-death')`.
-- [ ] **Смерть игрока**: `audioManager.play('player-death')`.
-- [ ] Триггеры — в presentation layer или рядом с HealthSystem / LootSystem, **не** внутри ECS-систем как сайд-эффект.
+- [x] **Атака игрока** (успешный DamageEvent с sourceId=player): `audioManager.play('attack')`.
+- [x] **Урон по игроку** (DamageEvent с targetId=player): `audioManager.play('hurt')`.
+- [x] **Подбор лута** (LootGranted): `audioManager.play('pickup')`.
+- [x] **Смерть врага** (CombatState → dead): `audioManager.play('enemy-death')`.
+- [x] **Смерть игрока**: `audioManager.play('player-death')`.
+- [x] Триггеры — в presentation layer или рядом с HealthSystem / LootSystem, **не** внутри ECS-систем как сайд-эффект.
 
 ### UI Mute
-- [ ] **Кнопка mute / unmute** в HUD:
+- [x] **Кнопка mute / unmute** в HUD:
   - Иконка (🔊 / 🔇 или простой текст «Sound: ON/OFF»).
   - Тап → `audioManager.setMuted(!)`.
   - Сохранять preference в `localStorage`.
-- [ ] При старте: читать `localStorage` → применять muted state.
+- [x] При старте: читать `localStorage` → применять muted state.
 
 ### Фоновая музыка (опционально)
 - [ ] Если есть подходящий трек:
   - `audioManager.playMusic(trackId)` — loop, низкая громкость.
   - `audioManager.setMusicVolume(v: number)`.
   - При mute → music тоже заглушается.
-- [ ] Если нет трека — пропустить, не блокирует ран.
+- [x] Если нет трека — пропустить, не блокирует ран.
 
 ## Ограничения
 

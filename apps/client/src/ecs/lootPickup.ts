@@ -47,6 +47,7 @@ function lootItemKindString(kind: number): string | undefined {
 /**
  * FSM лута: idle → reserved → despawning → remove (run-17).
  * Радиус подбора, reserved/таймаут, LootGranted в current (применение золота — фаза 3).
+ * Возвращает число успешных подборов за тик.
  */
 export function runLootSystem(
   world: World,
@@ -55,11 +56,11 @@ export function runLootSystem(
   queues: GameEventQueues,
   inventoryService: InventoryService,
   outDestroyRenderIds: number[]
-): boolean {
+): number {
   if (!hasComponent(world, playerEid, Player)) {
-    return false;
+    return 0;
   }
-  let granted = false;
+  let grantCount = 0;
   const px = Position.x[playerEid];
   const py = Position.y[playerEid];
   const dt = gameTime.dt;
@@ -145,7 +146,7 @@ export function runLootSystem(
           itemKind,
           pickerEid: by,
         });
-        granted = true;
+        grantCount += 1;
         LootState.state[leid] = LootStateEnum.Despawning;
         LootReserve.reservedBy[leid] = 0;
         LootReserve.reserveTimer[leid] = 0;
@@ -163,5 +164,5 @@ export function runLootSystem(
       LootReserve.reserveTimer[leid] = LOOT.RESERVE_TIMEOUT;
     }
   }
-  return granted;
+  return grantCount;
 }

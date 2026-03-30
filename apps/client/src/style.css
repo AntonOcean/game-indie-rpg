@@ -25,6 +25,23 @@ body {
   pointer-events: none;
 }
 
+#hud-mute {
+  position: fixed;
+  top: max(40px, calc(env(safe-area-inset-top, 0px) + 32px));
+  left: max(8px, env(safe-area-inset-left, 0px));
+  z-index: 15;
+  padding: 6px 10px;
+  min-width: 44px;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(22, 22, 38, 0.75);
+  color: #e8e8ef;
+  font: 700 16px/1 system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 #app {
   box-sizing: border-box;
   width: 100%;

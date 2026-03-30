@@ -26,8 +26,8 @@ import {
 export function processEnemyDeath(
   world: World,
   animationBuffer: AnimationIntentBuffer
-): boolean {
-  let anyNewDeath = false;
+): number {
+  let deathCount = 0;
   const entities = query(world, [Enemy, Health, Position]);
   for (let i = 0; i < entities.length; i++) {
     const eid = entities[i]!;
@@ -46,12 +46,12 @@ export function processEnemyDeath(
       continue;
     }
     addComponent(world, eid, DeathSequence);
-    anyNewDeath = true;
+    deathCount += 1;
     mergeAnimationIntent(animationBuffer, {
       entity: eid,
       state: AnimState.Death,
       force: true,
     });
   }
-  return anyNewDeath;
+  return deathCount;
 }

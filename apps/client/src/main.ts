@@ -65,6 +65,7 @@ import { createPlayerState } from "./state/playerState";
 import { createInventoryOverlay } from "./ui/inventoryOverlay";
 import { rollLoot } from "./data/lootTable";
 import { LootItemKindEnum } from "./ecs/components";
+import { createAudioManager } from "./audio/audioManager";
 
 async function main(): Promise<void> {
   const host = document.querySelector<HTMLDivElement>("#app");
@@ -140,7 +141,30 @@ async function main(): Promise<void> {
       console.warn(msg);
     }
   };
+
+  const audio = createAudioManager();
+  void audio.preload().catch(() => {});
+
   const goldHud = document.querySelector<HTMLDivElement>("#hud-gold");
+
+  const muteBtn = document.createElement("button");
+  muteBtn.id = "hud-mute";
+  muteBtn.type = "button";
+  muteBtn.setAttribute(
+    "aria-label",
+    audio.isMuted() ? "Unmute sound" : "Mute sound"
+  );
+  muteBtn.textContent = audio.isMuted() ? "🔇" : "🔊";
+  muteBtn.addEventListener("click", () => {
+    const next = !audio.isMuted();
+    audio.setMuted(next);
+    muteBtn.textContent = next ? "🔇" : "🔊";
+    muteBtn.setAttribute("aria-label", next ? "Unmute sound" : "Mute sound");
+    if (!next) {
+      audio.play("ui-click");
+    }
+  });
+  document.body.appendChild(muteBtn);
 
   const input = bindGameInput(
     app,
@@ -191,6 +215,7 @@ async function main(): Promise<void> {
   gameOverButton.style.background = "#7c3aed";
   gameOverButton.style.color = "#fff";
   gameOverButton.addEventListener("click", () => {
+    audio.play("ui-click");
     location.reload();
   });
 
@@ -227,6 +252,9 @@ async function main(): Promise<void> {
     playerEid,
     getPlayerMaxHp: () => PLAYER.MAX_HP,
     onInventoryMutated: () => cloudSave?.markDirty(),
+    onUiSound: () => {
+      audio.play("ui-click");
+    },
   });
 
   const inventoryButton = document.createElement("button");
@@ -302,18 +330,37 @@ async function main(): Promise<void> {
       ecsWorld,
       eventQueues,
       processedEvents,
-      undefined,
+      {
+        onDamageApplied: (ev) => {
+          if (ev.sourceId === playerEid) {
+            audio.play("attack");
+          }
+          if (ev.targetId === playerEid) {
+            audio.play("hurt");
+          }
+        },
+      },
       animationIntentBuffer,
       playerEid
     );
 
-    processPlayerDeath(ecsWorld, playerEid, animationIntentBuffer);
+    const playerDeathStarted = processPlayerDeath(
+      ecsWorld,
+      playerEid,
+      animationIntentBuffer
+    );
+    if (playerDeathStarted) {
+      audio.play("player-death");
+    }
     const playerCombatDeadNow =
       hasComponent(ecsWorld, playerEid, CombatState) &&
       CombatState.state[playerEid] === CombatStateEnum.dead;
 
-    const enemyJustDied = processEnemyDeath(ecsWorld, animationIntentBuffer);
-    const lootGranted = runLootSystem(
+    const enemyDeathCount = processEnemyDeath(ecsWorld, animationIntentBuffer);
+    for (let s = 0; s < enemyDeathCount; s++) {
+      audio.play("enemy-death");
+    }
+    const lootGrantCount = runLootSystem(
       ecsWorld,
       playerEid,
       gameTime,
@@ -321,7 +368,10 @@ async function main(): Promise<void> {
       inventoryService,
       pendingDestroyRenderIds
     );
-    if (cloudSave && (lootGranted || enemyJustDied)) {
+    for (let p = 0; p < lootGrantCount; p++) {
+      audio.play("pickup");
+    }
+    if (cloudSave && (lootGrantCount > 0 || enemyDeathCount > 0)) {
       cloudSave.markDirty();
     }
 

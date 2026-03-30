@@ -15,17 +15,17 @@ export function processPlayerDeath(
   world: World,
   playerEid: number,
   animationBuffer: AnimationIntentBuffer
-): void {
+): boolean {
   if (!hasComponent(world, playerEid, Health)) {
-    return;
+    return false;
   }
   if (Health.current[playerEid] > 0) {
-    return;
+    return false;
   }
 
   if (hasComponent(world, playerEid, CombatState)) {
     if (CombatState.state[playerEid] === CombatStateEnum.dead) {
-      return;
+      return false;
     }
     CombatState.state[playerEid] = CombatStateEnum.dead;
   }
@@ -37,6 +37,8 @@ export function processPlayerDeath(
       state: AnimState.Death,
       force: true,
     });
+    return true;
   }
+  return false;
 }
 

@@ -1,4 +1,5 @@
 import { hasComponent, type World } from "bitecs";
+import type { DamageEvent } from "../events/damageEvent";
 import type { GameEventQueues } from "../events/gameEventQueues";
 import type { ProcessedEvents } from "../events/processedEvents";
 import { AnimState } from "../animation/animationTypes";
@@ -11,6 +12,8 @@ import { CombatState, CombatStateEnum, Health } from "./components";
 export type Phase3LootHooks = {
   /** Один успешный grant = одна единица лута (MVP: золото). */
   onLootGranted?: (quantity: number) => void;
+  /** После успешного применения урона (идемпотентно, не дубликат eventId). */
+  onDamageApplied?: (ev: DamageEvent) => void;
 };
 
 /**
@@ -20,7 +23,7 @@ export function runHealthSystem(
   world: World,
   queues: GameEventQueues,
   processed: ProcessedEvents,
-  lootHooks?: Phase3LootHooks,
+  phase3Hooks?: Phase3LootHooks,
   animationBuffer?: AnimationIntentBuffer,
   playerEid?: number
 ): void {
@@ -37,6 +40,7 @@ export function runHealthSystem(
     const nextHp = targetHp - ev.amount;
     Health.current[ev.targetId] = nextHp;
     processed.markProcessed(ev.tickId, ev.eventId);
+    phase3Hooks?.onDamageApplied?.(ev);
 
     if (
       playerEid !== undefined &&
@@ -57,8 +61,8 @@ export function runHealthSystem(
   }
 
   const lootEv = queues.getLootGranted();
-  if (lootEv.length > 0 && lootHooks?.onLootGranted) {
-    lootHooks.onLootGranted(lootEv.length);
+  if (lootEv.length > 0 && phase3Hooks?.onLootGranted) {
+    phase3Hooks.onLootGranted(lootEv.length);
   }
 
   queues.clearProcessing();

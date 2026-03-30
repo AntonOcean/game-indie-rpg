@@ -35,9 +35,16 @@ export function createInventoryOverlay(args: {
   playerEid: number;
   getPlayerMaxHp: () => number;
   onInventoryMutated?: () => void;
+  onUiSound?: () => void;
 }): InventoryOverlay {
-  const { inventoryService, ecsWorld, playerEid, getPlayerMaxHp, onInventoryMutated } =
-    args;
+  const {
+    inventoryService,
+    ecsWorld,
+    playerEid,
+    getPlayerMaxHp,
+    onInventoryMutated,
+    onUiSound,
+  } = args;
 
   const overlay = document.createElement("div");
   overlay.id = "inventory-overlay";
@@ -108,11 +115,13 @@ export function createInventoryOverlay(args: {
   let open = false;
 
   const close = (): void => {
+    onUiSound?.();
     open = false;
     overlay.style.display = "none";
   };
 
   const openOverlay = (): void => {
+    onUiSound?.();
     open = true;
     overlay.style.display = "block";
     refresh();
@@ -182,6 +191,7 @@ export function createInventoryOverlay(args: {
         useBtn.style.color = "#fff";
 
         useBtn.addEventListener("click", () => {
+          onUiSound?.();
           if (!inventoryService.removeItem(itemId, 1)) {
             refresh();
             return;
