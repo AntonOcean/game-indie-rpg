@@ -6,8 +6,9 @@ import {
   removeEntity,
   type World,
 } from "bitecs";
-import { LOOT } from "../constants/gameBalance";
+import { ITEMS, LOOT } from "../constants/gameBalance";
 import type { GameEventQueues } from "../events/gameEventQueues";
+import type { InventoryService } from "../state/inventoryService";
 import type { GameTime } from "./gameTime";
 import {
   DespawnTimer,
@@ -34,7 +35,7 @@ function distanceCenters(
 
 function lootItemKindString(kind: number): string | undefined {
   if (kind === LootItemKindEnum.Gold) {
-    return "gold";
+    return ITEMS.GOLD;
   }
   return undefined;
 }
@@ -48,6 +49,7 @@ export function runLootSystem(
   playerEid: number,
   gameTime: GameTime,
   queues: GameEventQueues,
+  inventoryService: InventoryService,
   outDestroyRenderIds: number[]
 ): void {
   if (!hasComponent(world, playerEid, Player)) {
@@ -114,10 +116,26 @@ export function runLootSystem(
       }
       if (inRadius) {
         const kind = LootItemKind.kind[leid] ?? LootItemKindEnum.Gold;
+        const itemKind = lootItemKindString(kind);
+        if (!itemKind) {
+          LootState.state[leid] = LootStateEnum.Idle;
+          LootReserve.reservedBy[leid] = 0;
+          LootReserve.reserveTimer[leid] = 0;
+          continue;
+        }
+
+        const r = inventoryService.tryAddItem(itemKind, 1);
+        if (!r.ok) {
+          LootState.state[leid] = LootStateEnum.Idle;
+          LootReserve.reservedBy[leid] = 0;
+          LootReserve.reserveTimer[leid] = 0;
+          continue;
+        }
+
         queues.emitLootGranted({
           tickId: gameTime.tickId,
           entityId: leid,
-          itemKind: lootItemKindString(kind),
+          itemKind,
           pickerEid: by,
         });
         LootState.state[leid] = LootStateEnum.Despawning;

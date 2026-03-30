@@ -3,7 +3,7 @@ import "./protocol";
 import { Application } from "pixi.js";
 import { hasComponent } from "bitecs";
 import { applyWorldScale, updateWorldCamera } from "./camera/worldCamera";
-import { CAMERA, ENGINE } from "./constants/gameBalance";
+import { CAMERA, ENGINE, ITEMS } from "./constants/gameBalance";
 import { bindDebugOverlayToggle, createDebugOverlay } from "./debug/debugOverlay";
 import { createGameWorld } from "./ecs/createGameWorld";
 import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
@@ -54,6 +54,8 @@ import type { RenderEvent } from "./render/renderEvent";
 import { createHpBarLayer } from "./render/hpBarLayer";
 import { runRenderSystem } from "./render/renderSystem";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
+import { createInventoryService } from "./state/inventoryService";
+import { createPlayerState } from "./state/playerState";
 
 async function main(): Promise<void> {
   const host = document.querySelector<HTMLDivElement>("#app");
@@ -108,12 +110,13 @@ async function main(): Promise<void> {
   const animationIntentBuffer = createAnimationIntentBuffer();
   const renderAdapter = createRenderAdapter();
   const renderEventMailbox: RenderEvent[] = [];
+  const playerState = createPlayerState();
+  const inventoryService = createInventoryService(playerState);
   const devAnimWarn = (msg: string): void => {
     if (import.meta.env.DEV) {
       console.warn(msg);
     }
   };
-  let goldCount = 0;
   const goldHud = document.querySelector<HTMLDivElement>("#hud-gold");
 
   const input = bindGameInput(
@@ -177,7 +180,7 @@ async function main(): Promise<void> {
       renderRegistry,
       wx,
       wy,
-      "gold"
+      ITEMS.GOLD
     );
     spawnLootEntity(ecsWorld, lootRenderId, wx, wy);
   };
@@ -231,14 +234,7 @@ async function main(): Promise<void> {
       ecsWorld,
       eventQueues,
       processedEvents,
-      {
-        onLootGranted: (n: number) => {
-          goldCount += n;
-          if (goldHud) {
-            goldHud.textContent = `Gold: ${goldCount}`;
-          }
-        },
-      },
+      undefined,
       animationIntentBuffer,
       playerEid
     );
@@ -254,6 +250,7 @@ async function main(): Promise<void> {
       playerEid,
       gameTime,
       eventQueues,
+      inventoryService,
       pendingDestroyRenderIds
     );
 
@@ -295,6 +292,11 @@ async function main(): Promise<void> {
     );
     hpBarLayer.update(ecsWorld, worldRoot, playerEid);
     debugOverlay.update(ecsWorld, playerEid, gameTime);
+    if (goldHud) {
+      const s = inventoryService.getInventory().find((x) => x.itemId === ITEMS.GOLD);
+      const qty = s?.quantity ?? 0;
+      goldHud.textContent = `Gold: ${qty}`;
+    }
 
     eventQueues.swap();
     gameTime.tickId += 1;

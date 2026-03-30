@@ -58,6 +58,15 @@ export const LOOT = {
   DESPAWN_TIME: 0.3,
 } as const;
 
+export const INVENTORY = {
+  MAX_SLOTS: 20,
+  STACK_CAP: 99,
+} as const;
+
+export const ITEMS = {
+  GOLD: "gold",
+} as const;
+
 export const CAMERA = {
   WORLD_SCALE: 1,
   /** Дополнительный отступ при clamp камеры к границам карты (мир, px). MVP: 0. */
