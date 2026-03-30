@@ -37,6 +37,21 @@ run-11 → run-12 → run-13 → run-14 ─┐
 
 Строго последовательно: каждый ран опирается на предыдущий. Run-15 (HP bars) зависит от анимаций (run-14); run-16 (events) зависит от HP bars; и т.д.
 
+### Stats, Combat, NPCs, Shop
+
+```text
+run-24 → run-25 ──→ run-26
+                ↘
+run-27 → run-28 → run-29 → run-30
+```
+
+- **run-24 → run-25**: боевой модуль → интеграция в пайплайн (строго последовательно).
+- **run-26** (SaveData v2, статистика): зависит от run-25 (`GameRng`), но объём небольшой.
+- **run-27 → run-28**: NPC-система → диалоги (строго последовательно).
+- **run-29**: зависит от run-28 (NPC есть) + инвентарь (уже есть с run-21).
+- **run-30**: зависит от run-29 (`canAddItem`, `tryUseItem`) + run-27/28 (NPC-трейдер).
+- **run-24/25 и run-27/28 могут идти параллельно** (нет общих зависимостей).
+
 ## Соответствие плану имплементации
 
 ### MVP
@@ -72,6 +87,18 @@ run-11 → run-12 → run-13 → run-14 ─┐
 | run-22 | Фаза 5: Telegram initData, save/load |
 | run-23 | Фаза 6: звуковые эффекты |
 
+### Stats, Combat, NPCs, Shop
+
+| Файл рана | Фазы implementation-plan-stats-combat-npcs-shop |
+|-----------|--------------------------------------------------|
+| run-24 | § 2.0 (начало): типы + `resolveCombat` + `GameRng` + тесты |
+| run-25 | § 2: `BaseStats` ECS, `resolveFinalStats`, интеграция пайплайна |
+| run-26 | § 1: SaveData v2, stats wins/deaths, `CombatGroup`, `rngSeed` |
+| run-27 | § 3 (начало): NPC-компоненты, `resolveInteractionAtPoint`, трейдер |
+| run-28 | § 3 (UI): диалоговый оверлей, `dialogueDefs` |
+| run-29 | § 4 + § 5 (подготовка): `maxStack` fix, `canAddItem`, `tryUseItem` |
+| run-30 | § 5: `tryTrade`, shop overlay, покупка зелья |
+
 ## Итоговый чеклист MVP (после run-10)
 
 Сверка с `implementation-plan.md`:
@@ -99,11 +126,31 @@ run-11 → run-12 → run-13 → run-14 ─┐
 - [ ] Telegram initData авторизация + save/load
 - [ ] Звуковые эффекты + mute
 
+## Итоговый чеклист Stats/Combat/NPCs/Shop (после run-30)
+
+Сверка с `implementation-plan-stats-combat-npcs-shop.md`:
+
+- [ ] `resolveCombat` — единственная точка расчёта попадания и урона; юнит-тесты
+- [ ] `BaseStats` в ECS; `resolveFinalStats` — derived-слой; player + AI через один пайплайн
+- [ ] `GameRng` — детерминированный RNG, seed в SaveData
+- [ ] SaveData v2: миграция, `stats` (wins/deaths), `rngSeed`
+- [ ] `CombatGroup` на врагах; wins инкрементируется только при `CombatGroup`
+- [ ] NPC-система: `Npc`, `Interactable`, `resolveInteractionAtPoint`
+- [ ] Runtime guard: `Npc` + `Enemy` — запрещённая комбинация
+- [ ] Диалоговый оверлей, `dialogueDefs`, блокировка ввода
+- [ ] Исправление `maxStack` vs `STACK_CAP`; `canAddItem` dry-run
+- [ ] `tryUseItem` с guard `CombatState.dead` + shared cooldown
+- [ ] `tryTrade` атомарная покупка; `markDirty` после обеих мутаций
+- [ ] Shop overlay, debounce кнопки, авто-закрытие при исчезновении NPC
+- [ ] Трейдер на карте со спрайтом Trader-Idle
+
 ## Если контекста не хватает
 
 - **run-06** самый тяжёлый: при необходимости разбейте вручную на два чата — сначала утилиты коллизий + `PlayerIntent` + заглушка движения без полировки, затем разделение desktop/mobile, dt и откат по осям. Второму чату снова прикрепите `run-06` и укажите, что сделано из списка.
 - **run-13** (Animation FSM) тоже объёмный: при необходимости разделить на два чата — (1) ECS-компоненты + AnimationClips + AnimationSystem, (2) интеграция с RenderSync + spritesheet кадры + Facing.
 - **run-16** (EventQueues + Pipeline): если не помещается — (1) GameTime + GameEventQueues инфраструктура, (2) рефакторинг боя на события + HealthSystem.
+- **run-25** (BaseStats + интеграция): если контекст не влезает — (1) `BaseStats` компонент + `resolveFinalStats` + инициализация при спавне, (2) рефакторинг `playerCombat` + AI на `resolveCombat`.
+- **run-27** (NPC + Interaction): если контекст не влезает — (1) ECS-компоненты + `spawnNpc` + ассет трейдера, (2) `interactionResolver` + интеграция с вводом.
 
 ## Список файлов
 
@@ -139,3 +186,15 @@ run-11 → run-12 → run-13 → run-14 ─┐
 | [run-21-inventory-ui-and-loot-types.md](./run-21-inventory-ui-and-loot-types.md) | Фаза 4 (UI) | Множественные типы лута, UI инвентаря, USE_ITEM |
 | [run-22-telegram-auth-and-save.md](./run-22-telegram-auth-and-save.md) | Фаза 5 | initData верификация, save/load API, auto-save |
 | [run-23-sound-effects.md](./run-23-sound-effects.md) | Фаза 6 | SFX из `assets/audio/` (RPG Sound Pack), WAV, autoplay unlock, mute; BGM опционально отдельным файлом |
+
+### Stats, Combat, NPCs, Shop (run-24 — run-30)
+
+| Файл | Фаза impl-plan | Назначение |
+|------|-----------------|------------|
+| [run-24-combat-resolution-module.md](./run-24-combat-resolution-module.md) | A (начало) | `resolveCombat` чистая функция, типы, `GameRng`, юнит-тесты |
+| [run-25-base-stats-and-combat-integration.md](./run-25-base-stats-and-combat-integration.md) | A (интеграция) | `BaseStats` ECS, `resolveFinalStats`, рефакторинг player/AI combat |
+| [run-26-save-v2-and-player-stats.md](./run-26-save-v2-and-player-stats.md) | B | SaveData v2, stats wins/deaths, `CombatGroup`, `rngSeed` |
+| [run-27-npc-system-and-interaction.md](./run-27-npc-system-and-interaction.md) | C (начало) | `Npc`, `Interactable`, `resolveInteractionAtPoint`, трейдер на карте |
+| [run-28-dialogue-system.md](./run-28-dialogue-system.md) | C (UI) | `dialogueDefs`, dialogue overlay, блокировка ввода |
+| [run-29-inventory-fixes-and-use-item.md](./run-29-inventory-fixes-and-use-item.md) | D + E | Fix `maxStack`, `canAddItem`, `tryUseItem` с guards |
+| [run-30-shop-system.md](./run-30-shop-system.md) | D (магазин) | `tryTrade`, shop overlay, покупка зелья, debounce |
