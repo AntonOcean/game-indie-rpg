@@ -6,6 +6,7 @@ import {
   Health,
   Hitbox,
   Player,
+  CombatState,
   Position,
   RenderRef,
   Velocity,
@@ -63,6 +64,9 @@ export function spawnPlayerEntity(
   addComponent(world, eid, Health);
   Health.current[eid] = PLAYER.MAX_HP;
   Health.max[eid] = PLAYER.MAX_HP;
+
+  addComponent(world, eid, CombatState);
+  CombatState.state[eid] = 0; // alive
 
   addCharacterAnimationFacing(world, eid, "soldier");
 

@@ -5,6 +5,8 @@ import { LOOT } from "../constants/gameBalance";
 import { AI, AIState } from "../ecs/components/ai";
 import type { GameTime } from "../ecs/gameTime";
 import {
+  CombatState,
+  CombatStateEnum,
   Animation,
   Dead,
   Enemy,
@@ -157,7 +159,12 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
 
       const px = Position.x[playerEid];
       const py = Position.y[playerEid];
-      playerPosText.text = `tick: ${gameTime.tickId}  x: ${px.toFixed(0)}  y: ${py.toFixed(0)}`;
+      const cs =
+        hasComponent(world, playerEid, CombatState) &&
+        CombatState.state[playerEid] === CombatStateEnum.dead
+          ? "dead"
+          : "alive";
+      playerPosText.text = `tick: ${gameTime.tickId}  x: ${px.toFixed(0)}  y: ${py.toFixed(0)}  cs: ${cs}`;
       playerPosText.position.set(px + 16, py);
 
       hitGfx.circle(px, py, LOOT.PICKUP_RADIUS).stroke(PICKUP_RADIUS_STROKE);
@@ -198,7 +205,12 @@ export function createDebugOverlay(worldRoot: PixiContainer): DebugOverlay {
         const stLabel =
           st === AIState.Idle ? "idle" : st === AIState.Chase ? "chase" : "attack";
         const aiLab = ensureAiLabel(aiIndex++);
-        aiLab.text = `ai: ${stLabel}  off=${AI.thinkOffset[eid]}`;
+        const csLabel =
+          hasComponent(world, eid, CombatState) &&
+          CombatState.state[eid] === CombatStateEnum.dead
+            ? "dead"
+            : "alive";
+        aiLab.text = `ai: ${stLabel}  cs: ${csLabel}  off=${AI.thinkOffset[eid]}`;
         aiLab.position.set(cx, cy - rAgg - 6);
         aiLab.visible = true;
       }

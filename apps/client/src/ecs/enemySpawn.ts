@@ -4,9 +4,11 @@ import type { GameMapMeta } from "../gameMap";
 import {
   AI,
   AIState,
+  CombatState,
   Enemy,
   Health,
   Hitbox,
+  AttackCooldown,
   Position,
   RenderRef,
   StuckDetector,
@@ -82,9 +84,15 @@ export function spawnEnemyEntity(
   Health.current[eid] = ENEMY.HP;
   Health.max[eid] = ENEMY.HP;
 
+  addComponent(world, eid, CombatState);
+  CombatState.state[eid] = 0; // alive
+
   addComponent(world, eid, Velocity);
   Velocity.vx[eid] = 0;
   Velocity.vy[eid] = 0;
+
+  addComponent(world, eid, AttackCooldown);
+  AttackCooldown.untilSec[eid] = 0;
 
   const spawnIx = enemySpawnIndex++;
   addComponent(world, eid, AI);

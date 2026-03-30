@@ -39,7 +39,8 @@ export function consumeDeferredRenderEvents(
   events: RenderEvent[],
   animationBuffer: AnimationIntentBuffer,
   spawnLootAt: (worldX: number, worldY: number) => void,
-  playerEid: number
+  playerEid: number,
+  onPlayerDeathAnimationComplete?: () => void
 ): void {
   for (let i = 0; i < events.length; i++) {
     const ev = events[i]!;
@@ -70,6 +71,9 @@ export function consumeDeferredRenderEvents(
     const st = Animation.state[eid];
 
     if (st === AnimState.Death) {
+      if (ev.entity === playerEid) {
+        onPlayerDeathAnimationComplete?.();
+      }
       if (
         hasComponent(world, eid, Enemy) &&
         hasComponent(world, eid, DeathSequence) &&

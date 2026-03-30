@@ -1,6 +1,7 @@
 import "./style.css";
 import "./protocol";
 import { Application } from "pixi.js";
+import { hasComponent } from "bitecs";
 import { applyWorldScale, updateWorldCamera } from "./camera/worldCamera";
 import { CAMERA, ENGINE } from "./constants/gameBalance";
 import { bindDebugOverlayToggle, createDebugOverlay } from "./debug/debugOverlay";
@@ -9,6 +10,7 @@ import { pickEnemyAtWorld } from "./ecs/enemyHitTest";
 import { spawnEnemyEntity } from "./ecs/enemySpawn";
 import { consumeDeferredRenderEvents } from "./ecs/consumeRenderEvents";
 import { processEnemyDeath } from "./ecs/enemyDeath";
+import { processPlayerDeath } from "./ecs/playerDeath";
 import { runLootSystem } from "./ecs/lootPickup";
 import { spawnLootEntity } from "./ecs/lootSpawn";
 import type { AttackIntent } from "./events/attackIntent";
@@ -26,6 +28,7 @@ import {
 } from "./ecs/playerLocomotion";
 import {
   applyEnemyVelocityFromAI,
+  collectEnemyAttackIntents,
   moveEnemiesWithTileCollisions,
   runAIThinkSystem,
   syncEnemyVelocityAfterAIThink,
@@ -35,7 +38,7 @@ import { runAnimationSystem } from "./ecs/animationSystem";
 import { updateFacingFromVelocity } from "./ecs/facingSystem";
 import { enqueueLocomotionAnimationRequests } from "./ecs/locomotionAnimationIntent";
 import { spawnPlayerEntity } from "./ecs/playerSpawn";
-import { Position } from "./ecs/components";
+import { Position, CombatState, CombatStateEnum } from "./ecs/components";
 import { loadGameMap } from "./gameMap";
 import { bindGameInput } from "./input/inputBindings";
 import { emptyPlayerIntent } from "./input/playerIntent";
@@ -130,6 +133,44 @@ async function main(): Promise<void> {
   bindDebugOverlayToggle(window, debugOverlay);
   const hpBarLayer = createHpBarLayer(app.stage);
 
+  const gameOverOverlay = document.createElement("div");
+  gameOverOverlay.id = "game-over-overlay";
+  gameOverOverlay.style.display = "none";
+  gameOverOverlay.style.position = "fixed";
+  gameOverOverlay.style.inset = "0";
+  gameOverOverlay.style.background = "rgba(10, 10, 20, 0.65)";
+  gameOverOverlay.style.zIndex = "10";
+  gameOverOverlay.style.alignItems = "center";
+  gameOverOverlay.style.justifyContent = "center";
+  gameOverOverlay.style.pointerEvents = "auto";
+  gameOverOverlay.style.flexDirection = "column";
+
+  const gameOverTitle = document.createElement("div");
+  gameOverTitle.textContent = "Game Over";
+  gameOverTitle.style.font = "800 28px/1.1 system-ui, sans-serif";
+  gameOverTitle.style.color = "#e8e8ef";
+  gameOverTitle.style.textShadow = "0 2px 10px #000";
+
+  const gameOverButton = document.createElement("button");
+  gameOverButton.textContent = "Restart";
+  gameOverButton.style.marginTop = "16px";
+  gameOverButton.style.padding = "10px 16px";
+  gameOverButton.style.borderRadius = "10px";
+  gameOverButton.style.border = "0";
+  gameOverButton.style.cursor = "pointer";
+  gameOverButton.style.font = "700 16px/1.2 system-ui, sans-serif";
+  gameOverButton.style.background = "#7c3aed";
+  gameOverButton.style.color = "#fff";
+  gameOverButton.addEventListener("click", () => {
+    location.reload();
+  });
+
+  gameOverOverlay.appendChild(gameOverTitle);
+  gameOverOverlay.appendChild(gameOverButton);
+  document.body.appendChild(gameOverOverlay);
+
+  let gameOverShown = false;
+
   const spawnLootAt = (wx: number, wy: number): void => {
     const lootRenderId = createLootVisualAt(
       worldRoot,
@@ -148,15 +189,36 @@ async function main(): Promise<void> {
       renderEventsFromLastFrame,
       animationIntentBuffer,
       spawnLootAt,
-      playerEid
+      playerEid,
+      () => {
+        if (gameOverShown) {
+          return;
+        }
+        gameOverShown = true;
+        gameOverOverlay.style.display = "flex";
+      }
     );
 
     advanceGameTime(gameTime, app.ticker.deltaMS);
 
-    input.fillIntent(intent);
-
     attackIntents.length = 0;
-    collectPlayerAttackIntents(ecsWorld, playerEid, intent, attackIntents);
+
+    const playerCombatDeadAtStart =
+      hasComponent(ecsWorld, playerEid, CombatState) &&
+      CombatState.state[playerEid] === CombatStateEnum.dead;
+
+    if (!playerCombatDeadAtStart) {
+      input.fillIntent(intent);
+      collectPlayerAttackIntents(ecsWorld, playerEid, intent, attackIntents);
+    }
+
+    collectEnemyAttackIntents(
+      ecsWorld,
+      playerEid,
+      gameTime,
+      attackIntents
+    );
+
     resolveCombatAndEmitDamage(
       ecsWorld,
       gameTime,
@@ -165,14 +227,26 @@ async function main(): Promise<void> {
       animationIntentBuffer
     );
 
-    runHealthSystem(ecsWorld, eventQueues, processedEvents, {
-      onLootGranted: (n: number) => {
-        goldCount += n;
-        if (goldHud) {
-          goldHud.textContent = `Gold: ${goldCount}`;
-        }
+    runHealthSystem(
+      ecsWorld,
+      eventQueues,
+      processedEvents,
+      {
+        onLootGranted: (n: number) => {
+          goldCount += n;
+          if (goldHud) {
+            goldHud.textContent = `Gold: ${goldCount}`;
+          }
+        },
       },
-    });
+      animationIntentBuffer,
+      playerEid
+    );
+
+    processPlayerDeath(ecsWorld, playerEid, animationIntentBuffer);
+    const playerCombatDeadNow =
+      hasComponent(ecsWorld, playerEid, CombatState) &&
+      CombatState.state[playerEid] === CombatStateEnum.dead;
 
     processEnemyDeath(ecsWorld, animationIntentBuffer);
     runLootSystem(
@@ -184,8 +258,12 @@ async function main(): Promise<void> {
     );
 
     applyEnemyVelocityFromAI(ecsWorld, playerEid, gameTime);
-    resolvePlayerIntentToVelocity(playerEid, intent);
-    moveEntityWithTileCollisions(playerEid, meta, gameTime.dt);
+    if (!playerCombatDeadNow) {
+      resolvePlayerIntentToVelocity(playerEid, intent);
+      moveEntityWithTileCollisions(playerEid, meta, gameTime.dt);
+    } else {
+      resolvePlayerIntentToVelocity(playerEid, emptyPlayerIntent());
+    }
     moveEnemiesWithTileCollisions(ecsWorld, meta, gameTime.dt);
     updateStuckDetectorsAfterMovement(ecsWorld, gameTime);
     runAIThinkSystem(

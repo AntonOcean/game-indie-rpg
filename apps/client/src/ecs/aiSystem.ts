@@ -1,11 +1,15 @@
 import { hasComponent, query, type World } from "bitecs";
 import { AI, AIState } from "./components/ai";
 import {
+  AttackCooldown,
   Animation,
+  CombatState,
+  CombatStateEnum,
   Dead,
   Enemy,
   Facing,
   Hitbox,
+  Health,
   Position,
   StuckDetector,
   Velocity,
@@ -20,6 +24,7 @@ import {
   mergeAnimationIntent,
   type AnimationIntentBuffer,
 } from "../animation/animationIntentBuffer";
+import type { AttackIntent } from "../events/attackIntent";
 
 function distSq(ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
@@ -56,7 +61,11 @@ export function applyEnemyVelocityFromAI(
   if (!hasComponent(world, playerEid, Position)) {
     return;
   }
-  if (hasComponent(world, playerEid, Dead)) {
+  const playerCombatDead =
+    hasComponent(world, playerEid, CombatState) &&
+    CombatState.state[playerEid] === CombatStateEnum.dead;
+
+  if (playerCombatDead || hasComponent(world, playerEid, Dead)) {
     const stopped = query(world, [Enemy, Velocity]);
     for (let i = 0; i < stopped.length; i++) {
       const eid = stopped[i]!;
@@ -75,6 +84,20 @@ export function applyEnemyVelocityFromAI(
   for (let i = 0; i < ents.length; i++) {
     const eid = ents[i]!;
     if (hasComponent(world, eid, Dead)) {
+      continue;
+    }
+
+    if (
+      hasComponent(world, eid, CombatState) &&
+      CombatState.state[eid] === CombatStateEnum.dead
+    ) {
+      continue;
+    }
+
+    if (
+      hasComponent(world, eid, CombatState) &&
+      CombatState.state[eid] === CombatStateEnum.dead
+    ) {
       continue;
     }
 
@@ -185,7 +208,10 @@ export function runAIThinkSystem(
   if (!hasComponent(world, playerEid, Position)) {
     return;
   }
-  if (hasComponent(world, playerEid, Dead)) {
+  const playerCombatDead =
+    hasComponent(world, playerEid, CombatState) &&
+    CombatState.state[playerEid] === CombatStateEnum.dead;
+  if (playerCombatDead || hasComponent(world, playerEid, Dead)) {
     return;
   }
 
@@ -197,6 +223,13 @@ export function runAIThinkSystem(
   for (let i = 0; i < ents.length; i++) {
     const eid = ents[i]!;
     if (hasComponent(world, eid, Dead)) {
+      continue;
+    }
+
+    if (
+      hasComponent(world, eid, CombatState) &&
+      CombatState.state[eid] === CombatStateEnum.dead
+    ) {
       continue;
     }
 
@@ -262,11 +295,94 @@ export function syncEnemyVelocityAfterAIThink(world: World): void {
     if (hasComponent(world, eid, Dead)) {
       continue;
     }
+    if (
+      hasComponent(world, eid, CombatState) &&
+      CombatState.state[eid] === CombatStateEnum.dead
+    ) {
+      continue;
+    }
     const st = AI.state[eid];
     if (st === AIState.Idle || st === AIState.Attack) {
       Velocity.vx[eid] = 0;
       Velocity.vy[eid] = 0;
     }
+  }
+}
+
+/**
+ * AI-атаки врагов (run-19).
+ * Пушит `AttackIntent` в очереди (фаза 2) и дальше идёт общий конвейер:
+ * `AttackIntent → DamageEvent → HealthSystem`.
+ *
+ * Важно: AI НЕ эмитит `DamageEvent` напрямую.
+ */
+export function collectEnemyAttackIntents(
+  world: World,
+  playerEid: number,
+  gameTime: GameTime,
+  out: AttackIntent[]
+): void {
+  const playerCombatDead =
+    hasComponent(world, playerEid, CombatState) &&
+    CombatState.state[playerEid] === CombatStateEnum.dead;
+  if (playerCombatDead) {
+    return;
+  }
+
+  if (!hasComponent(world, playerEid, Position)) {
+    return;
+  }
+  if (!hasComponent(world, playerEid, Health)) {
+    return;
+  }
+  if (Health.current[playerEid] <= 0) {
+    return;
+  }
+
+  const px = Position.x[playerEid];
+  const py = Position.y[playerEid];
+
+  const ents = query(world, [
+    Enemy,
+    AI,
+    Position,
+    AttackCooldown,
+    Health,
+    CombatState,
+  ]);
+
+  for (let i = 0; i < ents.length; i++) {
+    const eid = ents[i]!;
+
+    if (CombatState.state[eid] === CombatStateEnum.dead) {
+      continue;
+    }
+    if (AI.state[eid] !== AIState.Attack) {
+      continue;
+    }
+    if (AI.targetId[eid] !== playerEid) {
+      continue;
+    }
+
+    const until = AttackCooldown.untilSec[eid] ?? 0;
+    if (until > 0 && gameTime.now < until) {
+      continue;
+    }
+
+    const ex = Position.x[eid];
+    const ey = Position.y[eid];
+    const d2 = distSq(ex, ey, px, py);
+    const rAtk = AI.attackRange[eid] ?? AICfg.ATTACK_RANGE;
+    if (d2 > rAtk * rAtk) {
+      continue;
+    }
+
+    out.push({
+      sourceId: eid,
+      targetId: playerEid,
+      sourceX: ex,
+      sourceY: ey,
+    });
   }
 }
 

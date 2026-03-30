@@ -9,7 +9,15 @@ import {
   mergeAnimationIntent,
   type AnimationIntentBuffer,
 } from "../animation/animationIntentBuffer";
-import { Dead, DeathSequence, Enemy, Health, Position } from "./components";
+import {
+  CombatState,
+  CombatStateEnum,
+  Dead,
+  DeathSequence,
+  Enemy,
+  Health,
+  Position,
+} from "./components";
 
 /**
  * HP≤0: один раз ставим death-клип + `DeathSequence`; лут и `Dead` — после
@@ -28,6 +36,11 @@ export function processEnemyDeath(
     if (Health.current[eid] > 0) {
       continue;
     }
+
+    if (hasComponent(world, eid, CombatState)) {
+      CombatState.state[eid] = CombatStateEnum.dead;
+    }
+
     if (hasComponent(world, eid, DeathSequence)) {
       continue;
     }

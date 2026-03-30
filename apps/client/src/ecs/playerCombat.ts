@@ -9,20 +9,21 @@ import {
   mergeAnimationIntent,
   type AnimationIntentBuffer,
 } from "../animation/animationIntentBuffer";
-import { PLAYER } from "../constants/gameBalance";
+import { AI as AICfg, PLAYER } from "../constants/gameBalance";
 import type { AttackIntent } from "../events/attackIntent";
 import type { GameEventQueues } from "../events/gameEventQueues";
 import type { PlayerIntent } from "../input/playerIntent";
 import type { GameTime } from "./gameTime";
 import {
   AttackCooldown,
+  CombatState,
+  CombatStateEnum,
   Dead,
   Enemy,
   Health,
+  Player,
   Position,
 } from "./components";
-
-const ATTACK_COOLDOWN_SEC = PLAYER.ATTACK_COOLDOWN_MS / 1000;
 
 /**
  * Из PlayerIntent: если задан attackTarget — одно намерение удара (позиция источника из мира).
@@ -61,56 +62,85 @@ export function resolveCombatAndEmitDamage(
 ): void {
   for (let i = 0; i < intents.length; i++) {
     const it = intents[i]!;
-    const playerEid = it.sourceId;
+    const source = it.sourceId;
     const target = it.targetId;
 
-    if (!hasComponent(world, target, Enemy)) {
+    const sourceIsPlayer = hasComponent(world, source, Player);
+    const sourceIsEnemy = hasComponent(world, source, Enemy);
+    if (!sourceIsPlayer && !sourceIsEnemy) {
       continue;
     }
-    if (hasComponent(world, target, Dead)) {
+
+    if (hasComponent(world, source, CombatState)) {
+      if (CombatState.state[source] === CombatStateEnum.dead) {
+        continue;
+      }
+    }
+
+    if (!hasComponent(world, source, AttackCooldown)) {
       continue;
     }
+
     if (!hasComponent(world, target, Health)) {
       continue;
     }
     if (Health.current[target] <= 0) {
       continue;
     }
+    if (hasComponent(world, target, CombatState)) {
+      if (CombatState.state[target] === CombatStateEnum.dead) {
+        continue;
+      }
+    }
+    // Мёртвые враги (run-09) больше не принимают урон.
+    if (hasComponent(world, target, Dead)) {
+      continue;
+    }
 
-    const until = AttackCooldown.untilSec[playerEid] ?? 0;
+    const until = AttackCooldown.untilSec[source] ?? 0;
     if (until > 0 && gameTime.now < until) {
       continue;
     }
 
-    const dx = Position.x[playerEid] - Position.x[target];
-    const dy = Position.y[playerEid] - Position.y[target];
+    const attackRange = sourceIsPlayer ? PLAYER.ATTACK_RANGE : AICfg.ATTACK_RANGE;
+    const dx = Position.x[source] - Position.x[target];
+    const dy = Position.y[source] - Position.y[target];
     const dist = Math.hypot(dx, dy);
-    if (dist >= PLAYER.ATTACK_RANGE) {
+    if (dist >= attackRange) {
       continue;
     }
 
-    const dmg = queues.emitDamage({
+    const amount = sourceIsPlayer ? PLAYER.ATTACK_DAMAGE : AICfg.ATTACK_DAMAGE;
+    queues.emitDamage({
       tickId: gameTime.tickId,
       sourceType: "entity",
-      sourceId: playerEid,
+      sourceId: source,
       targetId: target,
-      amount: PLAYER.ATTACK_DAMAGE,
+      amount,
       sourceX: it.sourceX,
       sourceY: it.sourceY,
     });
 
-    AttackCooldown.untilSec[playerEid] = gameTime.now + ATTACK_COOLDOWN_SEC;
+    const cooldownSec =
+      (sourceIsPlayer ? PLAYER.ATTACK_COOLDOWN_MS : AICfg.ATTACK_COOLDOWN_MS) / 1000;
+    AttackCooldown.untilSec[source] = gameTime.now + cooldownSec;
 
     mergeAnimationIntent(animationBuffer, {
-      entity: playerEid,
+      entity: source,
       state: AnimState.Attack,
     });
 
-    const payload: AttackPayload = { targetId: target };
-    sendPlayerEvent({ type: PlayerEventType.ATTACK, payload });
+    if (sourceIsPlayer) {
+      const payload: AttackPayload = { targetId: target };
+      sendPlayerEvent({ type: PlayerEventType.ATTACK, payload });
+    }
 
     if (import.meta.env.DEV) {
-      console.info("[game-rpg] DamageEvent", dmg);
+      console.info("[game-rpg] attack resolved", {
+        source,
+        target,
+        amount,
+      });
     }
   }
 }

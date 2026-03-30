@@ -17,3 +17,4 @@ export { Animation } from "./animation";
 export { Facing } from "./facing";
 export { AI, AIState } from "./ai";
 export { StuckDetector } from "./stuckDetector";
+export { CombatState, CombatStateEnum } from "./combatState";

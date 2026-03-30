@@ -1,7 +1,12 @@
 import { hasComponent, type World } from "bitecs";
 import type { GameEventQueues } from "../events/gameEventQueues";
 import type { ProcessedEvents } from "../events/processedEvents";
-import { Health } from "./components";
+import { AnimState } from "../animation/animationTypes";
+import {
+  mergeAnimationIntent,
+  type AnimationIntentBuffer,
+} from "../animation/animationIntentBuffer";
+import { CombatState, CombatStateEnum, Health } from "./components";
 
 export type Phase3LootHooks = {
   /** Один успешный grant = одна единица лута (MVP: золото). */
@@ -15,7 +20,9 @@ export function runHealthSystem(
   world: World,
   queues: GameEventQueues,
   processed: ProcessedEvents,
-  lootHooks?: Phase3LootHooks
+  lootHooks?: Phase3LootHooks,
+  animationBuffer?: AnimationIntentBuffer,
+  playerEid?: number
 ): void {
   const events = queues.getDamageEvents();
   for (let i = 0; i < events.length; i++) {
@@ -26,8 +33,27 @@ export function runHealthSystem(
     if (!hasComponent(world, ev.targetId, Health)) {
       continue;
     }
-    Health.current[ev.targetId] -= ev.amount;
+    const targetHp = Health.current[ev.targetId];
+    const nextHp = targetHp - ev.amount;
+    Health.current[ev.targetId] = nextHp;
     processed.markProcessed(ev.tickId, ev.eventId);
+
+    if (
+      playerEid !== undefined &&
+      ev.targetId === playerEid &&
+      animationBuffer &&
+      nextHp > 0
+    ) {
+      const playerCombatDead =
+        hasComponent(world, playerEid, CombatState) &&
+        CombatState.state[playerEid] === CombatStateEnum.dead;
+      if (!playerCombatDead) {
+        mergeAnimationIntent(animationBuffer, {
+          entity: playerEid,
+          state: AnimState.Hurt,
+        });
+      }
+    }
   }
 
   const lootEv = queues.getLootGranted();
