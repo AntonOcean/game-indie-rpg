@@ -54,6 +54,12 @@ import type { RenderEvent } from "./render/renderEvent";
 import { createHpBarLayer } from "./render/hpBarLayer";
 import { runRenderSystem } from "./render/renderSystem";
 import { initTelegramWebAppOnce, subscribeViewportResize } from "./twaShell";
+import {
+  applyLoadedSave,
+  authenticateAndLoadSave,
+  buildSaveData,
+  createCloudSaveController,
+} from "./save/cloudSave";
 import { createInventoryService } from "./state/inventoryService";
 import { createPlayerState } from "./state/playerState";
 import { createInventoryOverlay } from "./ui/inventoryOverlay";
@@ -72,6 +78,7 @@ async function main(): Promise<void> {
   });
 
   initTelegramWebAppOnce();
+  const cloudSession = await authenticateAndLoadSave();
 
   const app = new Application();
   await app.init({
@@ -115,6 +122,19 @@ async function main(): Promise<void> {
   const renderEventMailbox: RenderEvent[] = [];
   const playerState = createPlayerState();
   const inventoryService = createInventoryService(playerState);
+  if (cloudSession?.save) {
+    applyLoadedSave(ecsWorld, playerEid, playerState, cloudSession.save);
+  }
+
+  const cloudSessionToken = cloudSession?.sessionToken ?? null;
+  const cloudSave =
+    cloudSessionToken !== null
+      ? createCloudSaveController({
+          getSessionToken: () => cloudSessionToken,
+          build: () => buildSaveData(ecsWorld, playerEid, playerState),
+        })
+      : null;
+
   const devAnimWarn = (msg: string): void => {
     if (import.meta.env.DEV) {
       console.warn(msg);
@@ -206,6 +226,7 @@ async function main(): Promise<void> {
     ecsWorld,
     playerEid,
     getPlayerMaxHp: () => PLAYER.MAX_HP,
+    onInventoryMutated: () => cloudSave?.markDirty(),
   });
 
   const inventoryButton = document.createElement("button");
@@ -291,8 +312,8 @@ async function main(): Promise<void> {
       hasComponent(ecsWorld, playerEid, CombatState) &&
       CombatState.state[playerEid] === CombatStateEnum.dead;
 
-    processEnemyDeath(ecsWorld, animationIntentBuffer);
-    runLootSystem(
+    const enemyJustDied = processEnemyDeath(ecsWorld, animationIntentBuffer);
+    const lootGranted = runLootSystem(
       ecsWorld,
       playerEid,
       gameTime,
@@ -300,6 +321,9 @@ async function main(): Promise<void> {
       inventoryService,
       pendingDestroyRenderIds
     );
+    if (cloudSave && (lootGranted || enemyJustDied)) {
+      cloudSave.markDirty();
+    }
 
     applyEnemyVelocityFromAI(ecsWorld, playerEid, gameTime);
     if (!playerCombatDeadNow && canAcceptGameplayInput()) {

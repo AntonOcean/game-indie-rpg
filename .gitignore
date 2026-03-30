@@ -6,3 +6,4 @@ apps/client/public/assets/
 full-assets
 *.log
 .DS_Store
+data/saves/

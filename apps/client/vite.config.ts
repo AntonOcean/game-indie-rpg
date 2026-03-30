@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, "");
   const port = Number(env.CLIENT_DEV_PORT || process.env.CLIENT_DEV_PORT || 5173);
   const host = env.CLIENT_DEV_HOST || process.env.CLIENT_DEV_HOST || "0.0.0.0";
+  const apiTarget =
+    env.VITE_API_PROXY_TARGET ||
+    process.env.VITE_API_PROXY_TARGET ||
+    `http://127.0.0.1:${process.env.PORT || 3000}`;
 
   return {
     root: __dirname,
@@ -16,6 +20,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port,
       host,
+      proxy: {
+        "/api": apiTarget,
+        "/health": apiTarget,
+      },
     },
   };
 });

@@ -55,10 +55,11 @@ export function runLootSystem(
   queues: GameEventQueues,
   inventoryService: InventoryService,
   outDestroyRenderIds: number[]
-): void {
+): boolean {
   if (!hasComponent(world, playerEid, Player)) {
-    return;
+    return false;
   }
+  let granted = false;
   const px = Position.x[playerEid];
   const py = Position.y[playerEid];
   const dt = gameTime.dt;
@@ -144,6 +145,7 @@ export function runLootSystem(
           itemKind,
           pickerEid: by,
         });
+        granted = true;
         LootState.state[leid] = LootStateEnum.Despawning;
         LootReserve.reservedBy[leid] = 0;
         LootReserve.reserveTimer[leid] = 0;
@@ -161,4 +163,5 @@ export function runLootSystem(
       LootReserve.reserveTimer[leid] = LOOT.RESERVE_TIMEOUT;
     }
   }
+  return granted;
 }

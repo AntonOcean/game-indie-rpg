@@ -34,8 +34,10 @@ export function createInventoryOverlay(args: {
   ecsWorld: World;
   playerEid: number;
   getPlayerMaxHp: () => number;
+  onInventoryMutated?: () => void;
 }): InventoryOverlay {
-  const { inventoryService, ecsWorld, playerEid, getPlayerMaxHp } = args;
+  const { inventoryService, ecsWorld, playerEid, getPlayerMaxHp, onInventoryMutated } =
+    args;
 
   const overlay = document.createElement("div");
   overlay.id = "inventory-overlay";
@@ -197,6 +199,7 @@ export function createInventoryOverlay(args: {
             payload: { itemId },
           });
 
+          onInventoryMutated?.();
           refresh();
         });
 

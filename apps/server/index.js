@@ -1,5 +1,20 @@
 const path = require("path");
 const express = require("express");
+const dotenv = require("dotenv");
+const {
+  verifyTelegramInitData,
+  createSession,
+  requireTelegramSession,
+} = require("./auth");
+const {
+  SAVE_SCHEMA_VERSION,
+  validateSaveBody,
+  loadSave,
+  writeSave,
+} = require("./saveStore");
+
+dotenv.config({ path: path.join(__dirname, "..", "..", ".env") });
+dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -14,8 +29,69 @@ function resolveDist() {
 
 const dist = resolveDist();
 
+app.use(express.json({ limit: "1mb" }));
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.post("/api/auth", (req, res) => {
+  const botToken = process.env.BOT_TOKEN;
+  if (!botToken || typeof botToken !== "string") {
+    res.status(503).json({ ok: false, error: "bot_token_missing" });
+    return;
+  }
+
+  const initData = req.body && req.body.initData;
+  const v = verifyTelegramInitData(
+    typeof initData === "string" ? initData : "",
+    botToken
+  );
+
+  if (!v.ok) {
+    res.status(401).json({ ok: false, error: v.reason || "unauthorized" });
+    return;
+  }
+
+  const sessionToken = createSession(v.userId);
+  res.json({ ok: true, userId: v.userId, sessionToken });
+});
+
+app.get("/api/load", requireTelegramSession, async (req, res) => {
+  try {
+    const r = await loadSave(req.telegramUserId);
+    if (r.empty) {
+      res.json({ empty: true });
+      return;
+    }
+    res.json(r.save);
+  } catch (err) {
+    console.error("loadSave", err);
+    res.status(500).json({ ok: false, error: "load_failed" });
+  }
+});
+
+app.post("/api/save", requireTelegramSession, async (req, res) => {
+  /**
+   * MVP: сохраняем JSON как прислал клиент. Это не античит: позиция/HP — снимок
+   * клиент-authorитет игры; при серверной симуляции канон будет на сервере.
+   */
+  const checked = validateSaveBody(req.body);
+  if (!checked.ok) {
+    res.status(400).json({ ok: false, error: checked.reason });
+    return;
+  }
+  if (checked.data.version !== SAVE_SCHEMA_VERSION) {
+    res.status(400).json({ ok: false, error: "unsupported_save_version" });
+    return;
+  }
+  try {
+    await writeSave(req.telegramUserId, checked.data);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("writeSave", err);
+    res.status(500).json({ ok: false, error: "save_failed" });
+  }
 });
 
 app.use(express.static(dist));
